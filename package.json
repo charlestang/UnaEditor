@@ -1,0 +1,66 @@
+{
+  "name": "hexopress-editor",
+  "version": "0.1.0",
+  "description": "A Vue 3 editor component library based on CodeMirror 6",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "concurrently \"pnpm:dev:lib\" \"pnpm:dev:playground\" --names \"lib,playground\" --prefix-colors \"cyan,magenta\"",
+    "dev:lib": "vite build --watch",
+    "dev:playground": "pnpm --filter hexopress-editor-playground dev",
+    "build": "vue-tsc && vite build",
+    "build:playground": "pnpm --filter hexopress-editor-playground build",
+    "test": "vitest",
+    "test:run": "vitest --run",
+    "test:ui": "vitest --ui",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "vue-tsc --noEmit",
+    "check": "pnpm typecheck && pnpm lint && pnpm test:run"
+  },
+  "peerDependencies": {
+    "vue": "^3.5.25"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@typescript-eslint/eslint-plugin": "^8.56.1",
+    "@typescript-eslint/parser": "^8.56.1",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "@vue/test-utils": "^2.4.6",
+    "concurrently": "^9.2.1",
+    "eslint": "^10.0.2",
+    "eslint-plugin-vue": "^10.8.0",
+    "jsdom": "^28.1.0",
+    "prettier": "^3.8.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.1",
+    "vite": "^7.3.1",
+    "vitest": "^4.0.18",
+    "vue": "^3.5.25",
+    "vue-tsc": "^3.1.5"
+  },
+  "keywords": [
+    "vue",
+    "vue3",
+    "editor",
+    "codemirror",
+    "codemirror6",
+    "markdown"
+  ],
+  "author": "",
+  "license": "MIT"
+}
