@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, useAttrs } from 'vue'
 import { useEditor } from '../composables/useEditor'
 import { useFullscreen } from '../composables/useFullscreen'
 import type { EditorProps, EditorExposed } from '../types/editor'
+
+defineOptions({
+  inheritAttrs: false,
+})
 
 // Define props
 const props = withDefaults(defineProps<EditorProps>(), {
@@ -23,6 +27,8 @@ const emit = defineEmits<{
   drop: [files: File[]]
 }>()
 
+const attrs = useAttrs()
+
 // Editor container ref
 const editorContainer = ref<HTMLElement>()
 
@@ -40,7 +46,7 @@ defineExpose<EditorExposed>({
 </script>
 
 <template>
-  <div ref="editorContainer" class="una-editor"></div>
+  <div ref="editorContainer" class="una-editor" v-bind="attrs"></div>
 </template>
 
 <style scoped>

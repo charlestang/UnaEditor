@@ -11,6 +11,21 @@ import { markdown } from '@codemirror/lang-markdown'
 import { oneDark } from '@codemirror/theme-one-dark'
 import type { EditorProps } from '../types/editor'
 
+const fillHeightLayout = EditorView.theme({
+  '&': {
+    height: '100%',
+  },
+  '.cm-scroller': {
+    height: '100%',
+  },
+  '.cm-content': {
+    minHeight: '100%',
+  },
+  '.cm-gutters': {
+    minHeight: '100%',
+  },
+})
+
 export function useEditor(
   container: Ref<HTMLElement | undefined>,
   props: EditorProps,
@@ -66,6 +81,9 @@ export function useEditor(
 
       // Markdown language support
       markdown(),
+
+      // Keep the inner editor layout aligned with the container height
+      fillHeightLayout,
 
       // Theme (dynamic)
       themeCompartment.of(props.theme === 'dark' ? oneDark : []),
@@ -215,4 +233,3 @@ export function useEditor(
     getSelection,
   }
 }
-

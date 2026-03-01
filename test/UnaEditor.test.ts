@@ -12,6 +12,38 @@ describe('UnaEditor', () => {
     expect(wrapper.exists()).toBe(true)
   })
 
+  it('forwards user classes to the editor container', () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '',
+      },
+      attrs: {
+        class: 'custom-editor shell',
+      },
+    })
+
+    expect(wrapper.classes()).toContain('una-editor')
+    expect(wrapper.classes()).toContain('custom-editor')
+    expect(wrapper.classes()).toContain('shell')
+  })
+
+  it('forwards arbitrary attrs to the editor container', () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '',
+      },
+      attrs: {
+        id: 'editor-shell',
+        style: 'border: 1px solid red;',
+        'data-testid': 'editor-root',
+      },
+    })
+
+    expect(wrapper.attributes('id')).toBe('editor-shell')
+    expect(wrapper.attributes('data-testid')).toBe('editor-root')
+    expect(wrapper.attributes('style')).toContain('border: 1px solid red;')
+  })
+
   it('accepts v-model binding', async () => {
     const wrapper = mount(UnaEditor, {
       props: {
