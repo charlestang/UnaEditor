@@ -19,10 +19,10 @@
   "scripts": {
     "dev": "concurrently \"pnpm:dev:lib\" \"pnpm:dev:playground\" --names \"lib,playground\" --prefix-colors \"cyan,magenta\"",
     "dev:lib": "vite build --watch",
-    "dev:playground": "pnpm --filter hexopress-editor-playground dev",
+    "dev:playground": "pnpm --filter una-editor-playground dev",
     "build": "pnpm build:types && vite build",
-    "build:types": "vue-tsc -p tsconfig.build.json",
-    "build:playground": "pnpm --filter hexopress-editor-playground build",
+    "build:types": "vue-tsc -p tsconfig.json",
+    "build:playground": "pnpm --filter una-editor-playground build",
     "test": "vitest",
     "test:run": "vitest --run",
     "test:ui": "vitest --ui",

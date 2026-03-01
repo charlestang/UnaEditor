@@ -220,7 +220,7 @@ src/locales/
 **实现**:
 - 在 `playground/package.json` 中添加开发脚本
 - 更新 ESLint 配置，不忽略 playground 目录
-- 创建 `tsconfig.build.json` 用于类型声明生成
+- 复用根 `tsconfig.json` 用于类型声明生成
 
 **理由**:
 - Playground 是独立的开发环境，需要完整的工具链

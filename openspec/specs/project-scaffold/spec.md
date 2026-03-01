@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This specification defines the standard project structure, configuration, and tooling requirements for the HexoPress Editor component library. It ensures a consistent, maintainable, and modern development environment.
+This specification defines the standard project structure, configuration, and tooling requirements for the Una Editor component library. It ensures a consistent, maintainable, and modern development environment.
 
 ## Requirements
 
@@ -38,7 +38,7 @@ This specification defines the standard project structure, configuration, and to
 #### Scenario: playground 引用主包
 
 - **WHEN** 检查 playground/package.json
-- **THEN** dependencies 中包含 `"hexopress-editor": "workspace:*"`
+- **THEN** dependencies 中包含 `"una-editor": "workspace:*"`
 
 ### Requirement: 包配置文件
 

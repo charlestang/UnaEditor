@@ -4,6 +4,10 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "una-editor": ["../src/index.ts"]
+    },
     "jsx": "preserve",
     "jsxImportSource": "vue",
     "resolveJsonModule": true,

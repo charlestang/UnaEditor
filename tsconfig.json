@@ -33,5 +33,5 @@
     "types": ["vite/client"]
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue"],
-  "exclude": ["node_modules", "dist", "playground", "test", "vite.config.ts"]
+  "exclude": ["node_modules", "dist", "playground", "test"]
 }

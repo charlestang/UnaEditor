@@ -68,7 +68,7 @@
 
 - [x] 8.1 创建 playground/ 目录结构（src/, public/）
 - [x] 8.2 创建 playground/package.json，配置包名和依赖
-- [x] 8.3 在 playground/package.json 中添加 hexopress-editor: "workspace:\*" 依赖
+- [x] 8.3 在 playground/package.json 中添加 una-editor: "workspace:\*" 依赖
 - [x] 8.4 在 playground/package.json 中添加 vue 和 vite 依赖
 - [x] 8.5 创建 playground/index.html 入口文件
 - [x] 8.6 创建 playground/src/main.ts 应用入口

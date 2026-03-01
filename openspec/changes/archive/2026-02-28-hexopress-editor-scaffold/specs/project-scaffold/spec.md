@@ -32,7 +32,7 @@
 #### Scenario: playground 引用主包
 
 - **WHEN** 检查 playground/package.json
-- **THEN** dependencies 中包含 `"hexopress-editor": "workspace:*"`
+- **THEN** dependencies 中包含 `"una-editor": "workspace:*"`
 
 ### Requirement: 包配置文件
 

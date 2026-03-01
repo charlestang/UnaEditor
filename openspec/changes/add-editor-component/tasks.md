@@ -100,7 +100,7 @@
 
 - [x] 10.1 配置 Playground 的 lint、format、typecheck 脚本
 - [x] 10.2 修复 ESLint 配置，不忽略 playground 目录
-- [x] 10.3 创建 tsconfig.build.json 用于类型声明生成
+- [x] 10.3 复用 tsconfig.json 用于类型声明生成
 - [x] 10.4 使用 Compartment API 实现 theme、lineNumbers 等 props 的响应式更新
 - [x] 10.5 修正全屏模式实现（browser=CSS viewport, screen=Fullscreen API）
 - [x] 10.6 修复 vite.config.ts 的 lint 错误（path 和 __dirname）

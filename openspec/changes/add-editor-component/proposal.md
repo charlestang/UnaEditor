@@ -36,7 +36,6 @@ UnaEditor 需要一个核心的编辑器组件来提供 Markdown 编辑功能。
 - `src/composables/useFullscreen.ts` - 全屏功能复用
 - `src/locales/` - 国际化语言包（zh-CN, en-US）
 - `src/types/editor.ts` - 编辑器相关类型定义
-- `tsconfig.build.json` - 类型声明构建配置
 
 **影响范围**:
 - Playground 需要添加 UnaEditor 组件的演示页面

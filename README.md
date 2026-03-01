@@ -1,4 +1,4 @@
-# HexoPress Editor
+# Una Editor
 
 基于 CodeMirror 6 的 Vue 3 编辑器组件库。
 
@@ -15,18 +15,18 @@
 ## 安装
 
 ```bash
-pnpm add hexopress-editor
+pnpm add una-editor
 ```
 
 ## 使用
 
 ```vue
 <script setup lang="ts">
-import { Editor } from 'hexopress-editor';
+import { UnaEditor } from 'una-editor';
 </script>
 
 <template>
-  <Editor />
+  <UnaEditor />
 </template>
 ```
 
@@ -82,7 +82,7 @@ pnpm dev
 ## 项目结构
 
 ```
-hexopress-editor/
+una-editor/
 ├── src/                    # 组件源码
 ├── playground/            # 本地调试环境
 ├── docs/                  # 文档

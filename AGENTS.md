@@ -4,7 +4,7 @@
 
 ## 项目上下文
 
-**项目名称**: HexoPress Editor
+**项目名称**: Una Editor
 **项目类型**: Vue 3 组件库
 **主要目标**: 基于 CodeMirror 6 开发编辑器组件，封装为 npm 包
 
@@ -20,7 +20,7 @@
 ## 项目结构
 
 ```
-hexopress-editor/
+una-editor/
 ├── src/                    # 组件源码
 ├── playground/            # 本地调试环境
 ├── docs/                  # 文档

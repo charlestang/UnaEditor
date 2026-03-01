@@ -1,6 +1,6 @@
 ## Context
 
-这是一个全新的项目，目标是创建一个基于 CodeMirror 6 的 Vue 3 编辑器组件库。项目将作为独立的 npm 包发布，供 HexoPress 等项目使用。当前处于项目初始化阶段，需要搭建完整的开发、测试、构建和文档基础设施。
+这是一个全新的项目，目标是创建一个基于 CodeMirror 6 的 Vue 3 编辑器组件库。项目将作为独立的 npm 包发布，供其他项目使用。当前处于项目初始化阶段，需要搭建完整的开发、测试、构建和文档基础设施。
 
 技术栈约束：
 
@@ -34,7 +34,7 @@
 **决策**：采用 monorepo 结构，使用 pnpm workspace 管理主包和 playground
 
 ```
-hexopress-editor/
+una-editor/
 ├── src/                    # 主包源码
 ├── playground/            # 独立的 Vite 应用
 ├── docs/                  # 文档（预留）
@@ -67,7 +67,7 @@ export default defineConfig({
   build: {
     lib: {
       entry: resolve(__dirname, 'src/index.ts'),
-      name: 'HexopressEditor',
+      name: 'UnaEditor',
       formats: ['es', 'cjs'],
       fileName: (format) => `index.${format === 'es' ? 'mjs' : 'cjs'}`,
     },
@@ -123,7 +123,7 @@ export default defineConfig({
 // playground/package.json
 {
   "dependencies": {
-    "hexopress-editor": "workspace:*"
+    "una-editor": "workspace:*"
   }
 }
 ```
