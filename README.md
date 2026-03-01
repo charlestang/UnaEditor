@@ -8,6 +8,7 @@
 - 💪 TypeScript 支持
 - ⚡️ Vite 驱动
 - 🎨 Vue 3 Composition API
+- ✨ Hybrid Markdown 渲染模式（可选）
 - 📦 ESM 和 CommonJS 双格式输出
 - 🧪 Vitest 测试框架
 - 🔍 ESLint + Prettier 代码质量保证
@@ -26,9 +27,11 @@ import { UnaEditor } from 'una-editor';
 </script>
 
 <template>
-  <UnaEditor />
+  <UnaEditor :hybrid-markdown="true" />
 </template>
 ```
+
+`hybrid-markdown` 默认为 `false`。启用后，编辑器会在保持 Markdown 可编辑的前提下，对标题、强调、链接、行内代码和图片提供首期的混合渲染体验；Markdown 表格在首期仍保持源码显示。
 
 ## 开发
 

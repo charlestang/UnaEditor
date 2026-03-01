@@ -3,6 +3,7 @@ export interface EditorProps {
   modelValue: string
   language?: string
   lineNumbers?: boolean
+  hybridMarkdown?: boolean
   locale?: string | CustomLocale
   placeholder?: string
   disabled?: boolean

@@ -1,6 +1,26 @@
 import { describe, it, expect } from 'vitest'
+import { EditorView } from '@codemirror/view'
+import { nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
 import UnaEditor from '../src/components/UnaEditor.vue'
+import { moveHybridCursorVertically } from '../src/extensions/hybridMarkdown'
+
+async function getEditorView(wrapper: ReturnType<typeof mount>) {
+  await nextTick()
+
+  const editorRoot = wrapper.find('.cm-editor')
+  expect(editorRoot.exists()).toBe(true)
+
+  const view = EditorView.findFromDOM(editorRoot.element as HTMLElement)
+  expect(view).not.toBeNull()
+
+  return view!
+}
+
+async function focusEditorView(view: EditorView) {
+  view.focus()
+  await nextTick()
+}
 
 describe('UnaEditor', () => {
   it('renders properly', () => {
@@ -54,6 +74,17 @@ describe('UnaEditor', () => {
     expect(wrapper.props('modelValue')).toBe('initial content')
   })
 
+  it('respects hybridMarkdown prop', () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '',
+        hybridMarkdown: true,
+      },
+    })
+
+    expect(wrapper.props('hybridMarkdown')).toBe(true)
+  })
+
   it('respects lineNumbers prop', () => {
     const wrapper = mount(UnaEditor, {
       props: {
@@ -82,6 +113,170 @@ describe('UnaEditor', () => {
       },
     })
     expect(wrapper.props('theme')).toBe('dark')
+  })
+
+  it('keeps markdown source mode when hybrid rendering is disabled', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '# Heading',
+      },
+    })
+
+    await getEditorView(wrapper)
+
+    expect(wrapper.find('.cm-hybrid-hidden').exists()).toBe(false)
+  })
+
+  it('applies hybrid decorations when enabled', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '\n# Heading',
+        hybridMarkdown: true,
+      },
+    })
+
+    const view = await getEditorView(wrapper)
+    await focusEditorView(view)
+
+    expect(wrapper.find('.cm-hybrid-hidden').exists()).toBe(true)
+  })
+
+  it('reveals inline markdown source when the cursor enters the active structure', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '\n**bold**',
+        hybridMarkdown: true,
+      },
+    })
+
+    const view = await getEditorView(wrapper)
+    await focusEditorView(view)
+    expect(wrapper.findAll('.cm-hybrid-hidden').length).toBeGreaterThan(0)
+
+    view.dispatch({
+      selection: {
+        anchor: 4,
+      },
+    })
+
+    await nextTick()
+
+    expect(wrapper.find('.cm-hybrid-hidden').exists()).toBe(false)
+  })
+
+  it('treats the start of a heading as an active cursor position', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '\n# test',
+        hybridMarkdown: true,
+      },
+    })
+
+    const view = await getEditorView(wrapper)
+    await focusEditorView(view)
+    expect(wrapper.findAll('.cm-hybrid-hidden').length).toBeGreaterThan(0)
+
+    view.dispatch({
+      selection: {
+        anchor: 1,
+      },
+    })
+
+    await nextTick()
+
+    expect(wrapper.find('.cm-hybrid-hidden').exists()).toBe(false)
+  })
+
+  it('keeps the source column when moving vertically into a hybrid heading line', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '\n## test header\n',
+        hybridMarkdown: true,
+      },
+    })
+
+    const view = await getEditorView(wrapper)
+    await focusEditorView(view)
+
+    view.dispatch({
+      selection: {
+        anchor: 0,
+      },
+    })
+
+    await nextTick()
+
+    expect(moveHybridCursorVertically(view, 1)).toBe(true)
+    await nextTick()
+
+    expect(view.state.selection.main.from).toBe(1)
+    expect(wrapper.find('.cm-hybrid-hidden').exists()).toBe(false)
+
+    view.dispatch({
+      selection: {
+        anchor: 4,
+      },
+    })
+
+    await nextTick()
+
+    expect(moveHybridCursorVertically(view, -1)).toBe(true)
+    await nextTick()
+
+    expect(view.state.selection.main.from).toBe(0)
+  })
+
+  it('switches markdown image syntax between rendered and source states', async () => {
+    const markdown = '![Alt](https://example.com/demo.png)'
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: `\n${markdown}`,
+        hybridMarkdown: true,
+      },
+    })
+
+    const view = await getEditorView(wrapper)
+    await focusEditorView(view)
+    expect(wrapper.find('.cm-hybrid-image').exists()).toBe(true)
+
+    view.dispatch({
+      selection: {
+        anchor: 3,
+      },
+    })
+
+    await nextTick()
+
+    expect(wrapper.find('.cm-hybrid-image').exists()).toBe(false)
+    expect(wrapper.find('.cm-content').element.textContent).toContain(markdown)
+  })
+
+  it('keeps the first heading rendered while the editor is blurred on initial mount', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '# heading',
+        hybridMarkdown: true,
+      },
+    })
+
+    await getEditorView(wrapper)
+
+    expect(wrapper.find('.cm-hybrid-hidden').exists()).toBe(true)
+  })
+
+  it('keeps markdown tables in source mode while hybrid rendering is enabled', async () => {
+    const markdown = '| head | value |\n| --- | --- |\n| cell | text |'
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        hybridMarkdown: true,
+      },
+    })
+
+    await getEditorView(wrapper)
+
+    expect(wrapper.find('table').exists()).toBe(false)
+    expect(wrapper.find('.cm-content').element.textContent).toContain('| head | value |')
   })
 
   it('exposes focus and getSelection methods', () => {

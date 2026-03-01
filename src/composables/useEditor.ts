@@ -9,6 +9,7 @@ import {
 import { defaultKeymap } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
 import { oneDark } from '@codemirror/theme-one-dark'
+import { createHybridMarkdownExtensions } from '../extensions/hybridMarkdown'
 import type { EditorProps } from '../types/editor'
 
 const fillHeightLayout = EditorView.theme({
@@ -43,6 +44,7 @@ export function useEditor(
 
   // Compartments for dynamic reconfiguration
   const themeCompartment = new Compartment()
+  const hybridCompartment = new Compartment()
   const lineNumbersCompartment = new Compartment()
   const placeholderCompartment = new Compartment()
   const readOnlyCompartment = new Compartment()
@@ -84,6 +86,9 @@ export function useEditor(
 
       // Keep the inner editor layout aligned with the container height
       fillHeightLayout,
+
+      // Optional hybrid markdown rendering layer
+      hybridCompartment.of(props.hybridMarkdown ? createHybridMarkdownExtensions() : []),
 
       // Theme (dynamic)
       themeCompartment.of(props.theme === 'dark' ? oneDark : []),
@@ -173,6 +178,17 @@ export function useEditor(
       if (!editorView.value) return
       editorView.value.dispatch({
         effects: themeCompartment.reconfigure(newTheme === 'dark' ? oneDark : []),
+      })
+    }
+  )
+
+  // Watch hybridMarkdown prop and update dynamically
+  watch(
+    () => props.hybridMarkdown,
+    (enabled) => {
+      if (!editorView.value) return
+      editorView.value.dispatch({
+        effects: hybridCompartment.reconfigure(enabled ? createHybridMarkdownExtensions() : []),
       })
     }
   )

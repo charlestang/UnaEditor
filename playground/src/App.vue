@@ -5,11 +5,12 @@ import type { EditorExposed } from 'una-editor';
 
 // Editor state
 const content = ref(
-  '# Hello UnaEditor\n\n这是一个基于 CodeMirror 6 的 Markdown 编辑器。\n\n## 功能特性\n\n- 支持 v-model 双向绑定\n- 支持行号显示\n- 支持国际化（中英文）\n- 支持亮色/暗色主题\n- 支持全屏模式\n- 支持图片拖拽和粘贴\n- 支持 Mod-s 保存快捷键\n\n试试编辑这段文字，或者拖拽图片到编辑器中！',
+  '# Hello UnaEditor\n\n这是一个基于 CodeMirror 6 的 Markdown 编辑器。\n\n## 功能特性\n\n- 支持 v-model 双向绑定\n- 支持行号显示\n- 支持 Hybrid Markdown 渲染\n- 支持国际化（中英文）\n- 支持亮色/暗色主题\n- 支持全屏模式\n- 支持图片拖拽和粘贴\n- 支持 Mod-s 保存快捷键\n\n> 这是一段 blockquote，用来演示首期的保守增强效果。\n\n`inline code`、**bold**、*italic* 和 [link](https://codemirror.net/) 都可以在 hybrid 模式下看到更接近渲染态的显示。\n\n![UnaEditor Demo](https://placehold.co/320x160/orange/white?text=UnaEditor)\n\n```ts\nfunction greet(name: string) {\n  return `Hello, ${name}`;\n}\n```\n\n| feature | status |\n| --- | --- |\n| tables | source mode |\n\n试试编辑这段文字，或者拖拽图片到编辑器中！',
 );
 
 // Editor options
 const lineNumbers = ref(true);
+const hybridMarkdown = ref(true);
 const locale = ref<'zh-CN' | 'en-US'>('zh-CN');
 const theme = ref<'light' | 'dark'>('light');
 
@@ -67,6 +68,13 @@ const exitFullscreen = () => {
       </div>
 
       <div class="control-group">
+        <label>
+          <input v-model="hybridMarkdown" type="checkbox" />
+          Hybrid 渲染
+        </label>
+      </div>
+
+      <div class="control-group">
         <label>语言：</label>
         <select v-model="locale">
           <option value="zh-CN">中文</option>
@@ -96,6 +104,7 @@ const exitFullscreen = () => {
         ref="editorRef"
         v-model="content"
         :line-numbers="lineNumbers"
+        :hybrid-markdown="hybridMarkdown"
         :locale="locale"
         :theme="theme"
         placeholder="请输入 Markdown 内容..."
