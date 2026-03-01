@@ -1,8 +1,8 @@
-# HexoPress Editor - Claude 协作指南
+# UnaEditor - Claude 协作指南
 
 ## 项目概述
 
-这是一个基于 CodeMirror 6 的 Vue 3 编辑器组件库，封装为独立的 npm 包，用于 HexoPress 项目。
+这是一个基于 CodeMirror 6 的 Vue 3 编辑器组件库，封装为独立的 npm 包。
 
 ## 技术栈
 
@@ -16,7 +16,7 @@
 ## 项目结构
 
 ```
-hexopress-editor/
+una-editor/
 ├── src/                    # 组件源码
 │   └── index.ts           # 包入口
 ├── playground/            # 本地调试环境（独立 Vite 应用）

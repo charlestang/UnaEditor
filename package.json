@@ -1,5 +1,5 @@
 {
-  "name": "hexopress-editor",
+  "name": "una-editor",
   "version": "0.1.0",
   "description": "A Vue 3 editor component library based on CodeMirror 6",
   "type": "module",
@@ -20,7 +20,8 @@
     "dev": "concurrently \"pnpm:dev:lib\" \"pnpm:dev:playground\" --names \"lib,playground\" --prefix-colors \"cyan,magenta\"",
     "dev:lib": "vite build --watch",
     "dev:playground": "pnpm --filter hexopress-editor-playground dev",
-    "build": "vue-tsc && vite build",
+    "build": "pnpm build:types && vite build",
+    "build:types": "vue-tsc -p tsconfig.build.json",
     "build:playground": "pnpm --filter hexopress-editor-playground build",
     "test": "vitest",
     "test:run": "vitest --run",
@@ -62,5 +63,13 @@
     "markdown"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@codemirror/commands": "^6.10.2",
+    "@codemirror/lang-markdown": "^6.5.0",
+    "@codemirror/language": "^6.12.2",
+    "@codemirror/state": "^6.5.4",
+    "@codemirror/theme-one-dark": "^6.1.3",
+    "@codemirror/view": "^6.39.15"
+  }
 }

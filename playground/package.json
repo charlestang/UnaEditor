@@ -1,18 +1,23 @@
 {
-  "name": "hexopress-editor-playground",
+  "name": "una-editor-playground",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "hexopress-editor": "workspace:*",
+    "una-editor": "workspace:*",
     "vue": "^3.5.25"
   },
   "devDependencies": {
+    "@types/node": "^25.3.3",
     "@vitejs/plugin-vue": "^5.2.1",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",

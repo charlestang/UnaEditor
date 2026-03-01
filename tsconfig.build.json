@@ -8,7 +8,6 @@
 
     // Module resolution
     "target": "ES2020",
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
@@ -33,5 +32,5 @@
     "types": ["vite/client"]
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue"],
-  "exclude": ["node_modules", "dist", "playground", "test", "vite.config.ts"]
+  "exclude": ["node_modules", "dist", "playground", "test", "**/*.test.ts"]
 }
