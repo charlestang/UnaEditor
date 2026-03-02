@@ -17,7 +17,7 @@
 
 ### Modified Capabilities
 
-None.
+无。
 
 ## Impact
 

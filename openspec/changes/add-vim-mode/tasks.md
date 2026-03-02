@@ -1,21 +1,21 @@
-## 1. Dependency and API setup
+## 1. 依赖与 API 准备
 
-- [ ] 1.1 Add `@replit/codemirror-vim` to the project dependencies and confirm the package resolves in the current build setup
-- [ ] 1.2 Extend the editor prop types to expose a `vimMode` boolean that defaults to disabled
+- [ ] 1.1 将 `@replit/codemirror-vim` 加入项目依赖，并确认当前构建体系可以正确解析该包
+- [ ] 1.2 扩展编辑器 props 类型，暴露默认关闭的 `vimMode` 布尔开关
 
-## 2. Editor integration
+## 2. 编辑器集成
 
-- [ ] 2.1 Add a dedicated Vim compartment in `useEditor()` and wire Vim mode into the editor extension assembly
-- [ ] 2.2 Ensure Vim mode can be toggled dynamically on an existing editor instance without recreating the editor view
+- [ ] 2.1 在 `useEditor()` 中增加独立的 Vim compartment，并把 Vim 模式接入编辑器扩展装配流程
+- [ ] 2.2 确保可以在已有编辑器实例上动态开启或关闭 Vim 模式，而不重建 editor view
 
-## 3. Keyboard behavior compatibility
+## 3. 键盘行为兼容性
 
-- [ ] 3.1 Preserve the existing `Mod-s` save shortcut when Vim mode is active
-- [ ] 3.2 Validate that arrow-key navigation continues to follow the current editor navigation rules when Vim mode is active
-- [ ] 3.3 Verify the editor preserves standard behavior when `vimMode` is disabled or omitted
+- [ ] 3.1 在启用 Vim 模式时保留现有的 `Mod-s` 保存快捷键
+- [ ] 3.2 验证在启用 Vim 模式时，方向键导航仍然遵循当前编辑器的导航规则
+- [ ] 3.3 验证在 `vimMode` 关闭或未传入时，编辑器保持标准模式行为不变
 
-## 4. Verification and developer experience
+## 4. 验证与开发体验
 
-- [ ] 4.1 Add focused tests covering standard mode, Vim activation, modal text entry expectations, and save shortcut compatibility
-- [ ] 4.2 Update the Playground to expose a Vim mode toggle for manual verification
-- [ ] 4.3 Update README usage examples and prop documentation for the new `vimMode` option
+- [ ] 4.1 增加聚焦测试，覆盖标准模式、Vim 启用、模态输入预期和保存快捷键兼容性
+- [ ] 4.2 更新 Playground，提供 Vim 模式开关用于手动验证
+- [ ] 4.3 更新 README 的使用示例和 props 文档，加入新的 `vimMode` 说明

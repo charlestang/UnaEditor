@@ -136,6 +136,7 @@ una-editor/
 - **与用户沟通**: 必须使用中文
 - **代码注释**: 必须使用英文
 - **文档**: 使用中文（README, CLAUDE.md 等）
+- **OpenSpec artifacts**: 必须使用中文正文；规范关键字和结构关键字可保留英文（如 `SHALL`、`MUST`、`WHEN`、`THEN`、`Requirement`、`Scenario`），同一个 change 内必须保持语言风格一致
 - **变量名和函数名**: 使用英文
 - **Git 提交信息**: 必须使用英文
 
