@@ -1,9 +1,20 @@
-import { describe, it, expect } from 'vitest'
-import { EditorView } from '@codemirror/view'
+import { describe, it, expect, vi } from 'vitest'
+import { EditorView, keymap } from '@codemirror/view'
+import { getCM, Vim } from '@replit/codemirror-vim'
 import { nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
 import UnaEditor from '../src/components/UnaEditor.vue'
 import { moveHybridCursorVertically } from '../src/extensions/hybridMarkdown'
+
+if (typeof Range !== 'undefined') {
+  if (!Range.prototype.getClientRects) {
+    Range.prototype.getClientRects = () => [] as unknown as DOMRectList
+  }
+
+  if (!Range.prototype.getBoundingClientRect) {
+    Range.prototype.getBoundingClientRect = () => new DOMRect(0, 0, 0, 0)
+  }
+}
 
 async function getEditorView(wrapper: ReturnType<typeof mount>) {
   await nextTick()
@@ -85,6 +96,17 @@ describe('UnaEditor', () => {
     expect(wrapper.props('hybridMarkdown')).toBe(true)
   })
 
+  it('respects vimMode prop', () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '',
+        vimMode: true,
+      },
+    })
+
+    expect(wrapper.props('vimMode')).toBe(true)
+  })
+
   it('respects lineNumbers prop', () => {
     const wrapper = mount(UnaEditor, {
       props: {
@@ -125,6 +147,66 @@ describe('UnaEditor', () => {
     await getEditorView(wrapper)
 
     expect(wrapper.find('.cm-hybrid-hidden').exists()).toBe(false)
+  })
+
+  it('keeps standard mode behavior when vim mode is disabled', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: 'abc',
+      },
+    })
+
+    const view = await getEditorView(wrapper)
+
+    expect(getCM(view)).toBeNull()
+  })
+
+  it('enables vim mode and starts in normal mode by default', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: 'abc',
+        vimMode: true,
+      },
+    })
+
+    const view = await getEditorView(wrapper)
+    const cm = getCM(view)
+    expect(cm).not.toBeNull()
+    expect(cm!.state.vim?.insertMode).toBe(false)
+
+    Vim.handleKey(cm!, 'i', 'test')
+
+    expect(cm!.state.vim?.insertMode).toBe(true)
+  })
+
+  it('keeps Mod-s save shortcut while vim mode is active', async () => {
+    const onSave = vi.fn()
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: 'abc',
+        vimMode: true,
+        onSave,
+      },
+    })
+
+    const view = await getEditorView(wrapper)
+    const cm = getCM(view)
+    expect(cm).not.toBeNull()
+
+    const saveBinding = view.state
+      .facet(keymap)
+      .flat()
+      .find((binding) => binding.key === 'Mod-s' && typeof binding.run === 'function')
+
+    expect(saveBinding).toBeDefined()
+
+    expect(saveBinding!.run!(view)).toBe(true)
+    expect(onSave).toHaveBeenCalledTimes(1)
+
+    Vim.handleKey(cm!, 'i', 'test')
+
+    expect(saveBinding!.run!(view)).toBe(true)
+    expect(onSave).toHaveBeenCalledTimes(2)
   })
 
   it('applies hybrid decorations when enabled', async () => {

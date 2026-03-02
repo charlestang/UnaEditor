@@ -4,6 +4,7 @@ export interface EditorProps {
   language?: string
   lineNumbers?: boolean
   hybridMarkdown?: boolean
+  vimMode?: boolean
   locale?: string | CustomLocale
   placeholder?: string
   disabled?: boolean

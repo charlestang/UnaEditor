@@ -1,5 +1,5 @@
 import { ref, watch, onMounted, onBeforeUnmount, type Ref } from 'vue'
-import { EditorState, Compartment } from '@codemirror/state'
+import { EditorState, Compartment, Prec } from '@codemirror/state'
 import {
   EditorView,
   keymap,
@@ -9,6 +9,7 @@ import {
 import { defaultKeymap } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
 import { oneDark } from '@codemirror/theme-one-dark'
+import { vim } from '@replit/codemirror-vim'
 import { createHybridMarkdownExtensions } from '../extensions/hybridMarkdown'
 import type { EditorProps } from '../types/editor'
 
@@ -45,6 +46,7 @@ export function useEditor(
   // Compartments for dynamic reconfiguration
   const themeCompartment = new Compartment()
   const hybridCompartment = new Compartment()
+  const vimCompartment = new Compartment()
   const lineNumbersCompartment = new Compartment()
   const placeholderCompartment = new Compartment()
   const readOnlyCompartment = new Compartment()
@@ -70,19 +72,24 @@ export function useEditor(
       keymap.of(defaultKeymap),
 
       // Mod-s keymap for save
-      keymap.of([
-        {
-          key: 'Mod-s',
-          preventDefault: true,
-          run: () => {
-            emit('save')
-            return true
+      Prec.highest(
+        keymap.of([
+          {
+            key: 'Mod-s',
+            preventDefault: true,
+            run: () => {
+              emit('save')
+              return true
+            },
           },
-        },
-      ]),
+        ])
+      ),
 
       // Markdown language support
       markdown(),
+
+      // Optional vim mode behavior
+      vimCompartment.of(props.vimMode ? vim({ status: false }) : []),
 
       // Keep the inner editor layout aligned with the container height
       fillHeightLayout,
@@ -189,6 +196,17 @@ export function useEditor(
       if (!editorView.value) return
       editorView.value.dispatch({
         effects: hybridCompartment.reconfigure(enabled ? createHybridMarkdownExtensions() : []),
+      })
+    }
+  )
+
+  // Watch vimMode prop and update dynamically
+  watch(
+    () => props.vimMode,
+    (enabled) => {
+      if (!editorView.value) return
+      editorView.value.dispatch({
+        effects: vimCompartment.reconfigure(enabled ? vim({ status: false }) : []),
       })
     }
   )

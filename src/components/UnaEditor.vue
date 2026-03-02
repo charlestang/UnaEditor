@@ -14,6 +14,7 @@ const props = withDefaults(defineProps<EditorProps>(), {
   language: 'markdown',
   lineNumbers: true,
   hybridMarkdown: false,
+  vimMode: false,
   locale: 'zh-CN',
   theme: 'light',
 })

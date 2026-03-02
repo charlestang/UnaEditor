@@ -9,6 +9,7 @@
 - ⚡️ Vite 驱动
 - 🎨 Vue 3 Composition API
 - ✨ Hybrid Markdown 渲染模式（可选）
+- ⌨️ Vim 键位模式（可选）
 - 📦 ESM 和 CommonJS 双格式输出
 - 🧪 Vitest 测试框架
 - 🔍 ESLint + Prettier 代码质量保证
@@ -27,11 +28,13 @@ import { UnaEditor } from 'una-editor';
 </script>
 
 <template>
-  <UnaEditor :hybrid-markdown="true" />
+  <UnaEditor :hybrid-markdown="true" :vim-mode="false" />
 </template>
 ```
 
 `hybrid-markdown` 默认为 `false`。启用后，编辑器会在保持 Markdown 可编辑的前提下，对标题、强调、链接、行内代码和图片提供首期的混合渲染体验；Markdown 表格在首期仍保持源码显示。
+
+`vim-mode` 默认为 `false`。启用后，编辑器会切换到 Vim 键位模式，并以经典的 Vim 模态编辑行为工作；`Mod-s` 保存快捷键仍然可用。
 
 ## 开发
 

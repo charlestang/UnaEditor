@@ -11,6 +11,7 @@ const content = ref(
 // Editor options
 const lineNumbers = ref(true);
 const hybridMarkdown = ref(true);
+const vimMode = ref(false);
 const locale = ref<'zh-CN' | 'en-US'>('zh-CN');
 const theme = ref<'light' | 'dark'>('light');
 
@@ -75,6 +76,13 @@ const exitFullscreen = () => {
       </div>
 
       <div class="control-group">
+        <label>
+          <input v-model="vimMode" type="checkbox" />
+          Vim 模式
+        </label>
+      </div>
+
+      <div class="control-group">
         <label>语言：</label>
         <select v-model="locale">
           <option value="zh-CN">中文</option>
@@ -105,6 +113,7 @@ const exitFullscreen = () => {
         v-model="content"
         :line-numbers="lineNumbers"
         :hybrid-markdown="hybridMarkdown"
+        :vim-mode="vimMode"
         :locale="locale"
         :theme="theme"
         placeholder="请输入 Markdown 内容..."
