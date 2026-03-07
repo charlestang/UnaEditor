@@ -2,6 +2,55 @@ import { Decoration, EditorView, ViewPlugin, WidgetType, keymap } from '@codemir
 import { syntaxTree } from '@codemirror/language'
 import { Prec, type Extension } from '@codemirror/state'
 import type { DecorationSet, ViewUpdate } from '@codemirror/view'
+import { Vim } from '@replit/codemirror-vim'
+
+let vimHybridNavInitialized = false
+
+function setupVimLogicalNavigation() {
+  if (vimHybridNavInitialized) return
+  vimHybridNavInitialized = true
+
+  try {
+    // Define a custom strict-logical motion for Vim mode
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    Vim.defineMotion('hybridMoveByLines', (cm: any, head: any, motionArgs: any, vimState: any) => {
+      const view = cm.cm6
+      if (!view) return head
+
+      const direction = motionArgs.forward ? 1 : -1
+      const count = motionArgs.repeat || 1
+
+      const currentLine = view.state.doc.lineAt(cm.indexFromPos(head))
+      const targetLineNumber = currentLine.number + direction * count
+
+      if (targetLineNumber < 1) {
+        return cm.posFromIndex(0)
+      }
+      if (targetLineNumber > view.state.doc.lines) {
+        return cm.posFromIndex(view.state.doc.length)
+      }
+
+      const targetLine = view.state.doc.line(targetLineNumber)
+
+      // Use Vim's internal goal column state (lastHPos)
+      let goalColumn = vimState.lastHPos
+      if (goalColumn === undefined || goalColumn < 0) {
+        goalColumn = head.ch
+      }
+
+      const targetPosition = Math.min(targetLine.to, targetLine.from + goalColumn)
+      return cm.posFromIndex(targetPosition)
+    })
+
+    // Map the standard vertical movements to our logical motion
+    Vim.mapCommand('j', 'motion', 'hybridMoveByLines', { forward: true, linewise: true }, {})
+    Vim.mapCommand('k', 'motion', 'hybridMoveByLines', { forward: false, linewise: true }, {})
+    Vim.mapCommand('<Down>', 'motion', 'hybridMoveByLines', { forward: true, linewise: true }, {})
+    Vim.mapCommand('<Up>', 'motion', 'hybridMoveByLines', { forward: false, linewise: true }, {})
+  } catch {
+    // Silently ignore if Vim is not fully available or compatible
+  }
+}
 
 interface HybridScope {
   from: number
@@ -229,27 +278,8 @@ function isInActiveScope(node: { from: number; to: number }, scopes: HybridScope
   return scopes.some((scope) => node.from >= scope.from && node.to <= scope.to)
 }
 
-function findHybridScopeAtPosition(view: EditorView, position: number): HybridScope | null {
-  const selection = {
-    from: position,
-    to: position,
-  }
-  const scopes: HybridScope[] = []
-  const seen = new Set<string>()
-  const left = syntaxTree(view.state).resolveInner(position, -1) as ActiveSyntaxNode
-  const right = syntaxTree(view.state).resolveInner(position, 1) as ActiveSyntaxNode
-
-  addScopeFromNode(left, selection, scopes, seen)
-  addScopeFromNode(right, selection, scopes, seen)
-
-  return scopes[0] ?? null
-}
-
-function lineTouchesHybridScope(view: EditorView, line: { from: number; to: number }): boolean {
-  if (findHybridScopeAtPosition(view, line.from)) return true
-  if (line.to > line.from && findHybridScopeAtPosition(view, line.to - 1)) return true
-  return false
-}
+// Track the "goal column" for vertical navigation
+let virtualGoalColumn: number | null = null
 
 export function moveHybridCursorVertically(view: EditorView, direction: -1 | 1): boolean {
   const selection = view.state.selection.main
@@ -259,27 +289,48 @@ export function moveHybridCursorVertically(view: EditorView, direction: -1 | 1):
   const currentLine = view.state.doc.lineAt(selection.from)
   const targetLineNumber = currentLine.number + direction
 
-  if (targetLineNumber < 1 || targetLineNumber > view.state.doc.lines) return false
+  if (targetLineNumber < 1 || targetLineNumber > view.state.doc.lines) {
+    virtualGoalColumn = null // Reset on boundary
+    return false
+  }
 
   const targetLine = view.state.doc.line(targetLineNumber)
   const currentColumn = selection.from - currentLine.from
 
-  if (!lineTouchesHybridScope(view, currentLine) && !lineTouchesHybridScope(view, targetLine)) {
-    return false
+  // 1. Determine the goal column:
+  // If we already have a goal column from a previous vertical move, keep it.
+  // Otherwise, set the current column as the new goal column.
+  if (virtualGoalColumn === null) {
+    virtualGoalColumn = currentColumn
   }
 
-  const targetPosition = Math.min(targetLine.to, targetLine.from + currentColumn)
+  // 2. Calculate target position using the goal column
+  const targetPosition = Math.min(targetLine.to, targetLine.from + virtualGoalColumn)
 
   if (targetPosition === selection.from) return false
 
+  // 3. Dispatch the change with a user event so we can detect it
   view.dispatch({
     selection: {
       anchor: targetPosition,
     },
+    userEvent: 'select.hybrid-vertical',
   })
 
   return true
 }
+
+// A plugin to reset the virtual goal column when the user clicks or types
+const goalColumnResetPlugin = ViewPlugin.fromClass(
+  class {
+    update(update: ViewUpdate) {
+      // If the selection changed, but NOT because of our vertical navigation
+      if (update.selectionSet && !update.transactions.some((tr) => tr.isUserEvent('select.hybrid-vertical'))) {
+        virtualGoalColumn = null
+      }
+    }
+  }
+)
 
 function getBufferedVisibleRanges(view: EditorView, buffer = 160): { from: number; to: number }[] {
   const ranges = view.visibleRanges.map((range) => ({
@@ -391,7 +442,24 @@ function buildDecorations(view: EditorView, activeScopes: HybridScope[]): Decora
           return
         }
 
-        if (node.name === 'HeaderMark' || node.name === 'LinkMark' || node.name === 'URL' || node.name === 'EmphasisMark' || node.name === 'QuoteMark') {
+        if (node.name === 'HeaderMark' || node.name === 'QuoteMark') {
+          let hideTo = node.to
+          const textAfter = view.state.doc.sliceString(node.to, Math.min(node.to + 10, view.state.doc.length))
+          const spaceMatch = textAfter.match(/^[ \t]+/)
+
+          // If it's a HeaderMark, only swallow spaces if it starts with '#' (ATX Heading)
+          const isATXHeader = node.name === 'HeaderMark' && view.state.doc.sliceString(node.from, node.from + 1) === '#'
+          const isQuote = node.name === 'QuoteMark'
+
+          if ((isATXHeader || isQuote) && spaceMatch) {
+            hideTo += spaceMatch[0].length
+          }
+
+          decorations.push(hiddenDecoration.range(node.from, hideTo))
+          return
+        }
+
+        if (node.name === 'LinkMark' || node.name === 'URL' || node.name === 'EmphasisMark') {
           decorations.push(hiddenDecoration.range(node.from, node.to))
           return
         }
@@ -417,8 +485,11 @@ function buildDecorations(view: EditorView, activeScopes: HybridScope[]): Decora
 }
 
 export function createHybridMarkdownExtensions(): Extension {
+  setupVimLogicalNavigation()
+
   return [
     HYBRID_THEME,
+    goalColumnResetPlugin,
     Prec.highest(
       keymap.of([
         {
