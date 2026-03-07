@@ -1,111 +1,99 @@
 # Una Editor
 
-基于 CodeMirror 6 的 Vue 3 编辑器组件库。
+[English](./README.en.md) | [简体中文](./README.md)
 
-## 特性
+[![npm version](https://img.shields.io/npm/v/una-editor.svg)](https://www.npmjs.com/package/una-editor)
+[![license](https://img.shields.io/npm/l/una-editor.svg)](https://github.com/charlestang/una-editor/blob/main/LICENSE)
 
-- 🚀 基于 CodeMirror 6 构建
-- 💪 TypeScript 支持
-- ⚡️ Vite 驱动
-- 🎨 Vue 3 Composition API
-- ✨ Hybrid Markdown 渲染模式（可选）
-- ⌨️ Vim 键位模式（可选）
-- 📦 ESM 和 CommonJS 双格式输出
-- 🧪 Vitest 测试框架
-- 🔍 ESLint + Prettier 代码质量保证
+基于 CodeMirror 6 构建的轻量级、高性能 Vue 3 编辑器组件库。
 
-## 安装
+[在线演示 (Live Demo) 🚀](#) <!-- 替换为你的实际在线演示地址 -->
 
+## ✨ 特性
+
+- 🚀 **基于 CodeMirror 6**：提供强大的底层编辑能力与优异的性能。
+- 🎨 **Vue 3 友好**：完全基于 Composition API 构建，完美契合 Vue 生态。
+- 💪 **类型安全**：100% TypeScript 编写，提供完整的类型推导。
+- ⚡️ **Vite 驱动**：极速的本地开发与构建体验。
+- 📝 **Hybrid Markdown 渲染**：可选的混合渲染模式，在编辑态即可获得标题、强调、代码块等元素的即时预览。
+- ⌨️ **Vim 模式支持**：内置经典的 Vim 模态编辑与键位绑定。
+- 📦 **双格式输出**：同时支持 ESM 和 CommonJS。
+
+## 📦 安装
+
+使用 pnpm (推荐):
 ```bash
 pnpm add una-editor
 ```
+或使用 npm / yarn:
+```bash
+npm install una-editor
+# 或
+yarn add una-editor
+```
 
-## 使用
+## 🚀 快速开始
 
 ```vue
 <script setup lang="ts">
+import { ref } from 'vue';
 import { UnaEditor } from 'una-editor';
+
+const content = ref('# Hello Una Editor!');
 </script>
 
 <template>
-  <UnaEditor :hybrid-markdown="true" :vim-mode="false" />
+  <UnaEditor 
+    v-model="content"
+    :hybrid-markdown="true" 
+    :vim-mode="false" 
+  />
 </template>
 ```
 
-`hybrid-markdown` 默认为 `false`。启用后，编辑器会在保持 Markdown 可编辑的前提下，对标题、强调、链接、行内代码和图片提供首期的混合渲染体验；Markdown 表格在首期仍保持源码显示。
+## 📖 API 文档
 
-`vim-mode` 默认为 `false`。启用后，编辑器会切换到 Vim 键位模式，并以经典的 Vim 模态编辑行为工作；`Mod-s` 保存快捷键仍然可用。
+关于详细的组件属性 (Props)、事件 (Events)、对外暴露的方法 (Methods) 等内容，请查阅我们的 **[API 手册](./docs/api.md)**。
 
-## 开发
+## 🛠️ 本地开发
 
-### 安装依赖
+克隆项目后，你可以通过以下命令在本地启动开发环境和 Playground：
 
 ```bash
+# 安装依赖
 pnpm install
-```
 
-### 开发模式
-
-```bash
+# 启动本地开发与 Playground
 pnpm dev
 ```
+访问 `http://localhost:5173` 即可查看本地调试效果。
 
-### 构建
+### 其他常用命令
 
-```bash
-pnpm build
-```
+- `pnpm build`: 构建生产包 (dist)
+- `pnpm test`: 运行 Vitest 单元测试
+- `pnpm lint`: 运行 ESLint 代码检查
+- `pnpm format`: 运行 Prettier 格式化代码
 
-### 测试
+## 📁 项目结构
 
-```bash
-pnpm test
-```
-
-### 代码检查
-
-```bash
-pnpm lint
-```
-
-### 代码格式化
-
-```bash
-pnpm format
-```
-
-## Playground
-
-本项目包含一个 playground 用于本地调试：
-
-```bash
-cd playground
-pnpm dev
-```
-
-访问 http://localhost:5173 查看效果。
-
-## 项目结构
-
-```
+```text
 una-editor/
-├── src/                    # 组件源码
-├── playground/            # 本地调试环境
-├── docs/                  # 文档
-├── test/                  # 测试文件
-├── dist/                  # 构建输出
-└── openspec/              # OpenSpec 变更管理
+├── src/                    # 组件核心源码
+├── playground/             # 本地调试演示环境 (Vite App)
+├── docs/                   # 项目文档
+├── test/                   # 测试文件
+├── dist/                   # 构建输出目录
+└── openspec/               # OpenSpec 变更与规范管理
 ```
 
-## 技术栈
+## 🤝 参与贡献
 
-- Vue 3.5.25+
-- TypeScript 5.9.3+
-- Vite 7.3.1+
-- Vitest 4.0+
-- ESLint 10.0+
-- Prettier 3.8+
+欢迎提交 Pull Request 或开设 Issue 讨论新特性与 Bug。在提交代码前，请确保：
+1. 运行 `pnpm lint` 和 `pnpm test` 通过所有检查。
+2. 遵循现有的代码规范与 [Conventional Commits](https://www.conventionalcommits.org/) 提交信息格式。
+3. 较大的功能变更，请先查阅 `openspec/` 目录下的设计规范流程。
 
-## License
+## 📄 开源协议
 
-MIT
+本项目基于 [MIT License](./LICENSE) 开源。

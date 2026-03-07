@@ -1,0 +1,35 @@
+# Una Editor API 手册
+
+[English](./api.en.md) | [简体中文](./api.md)
+
+本文档列出了 `UnaEditor` 组件提供的各项属性、事件以及对外暴露的方法。
+
+## 属性 (Props)
+
+| 属性名 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `modelValue` / `v-model` | `string` | `''` | 编辑器内容 |
+| `hybridMarkdown` | `boolean` | `false` | 是否开启混合渲染模式。开启后会对标题、强调、链接等提供所见即所得的体验。 |
+| `vimMode` | `boolean` | `false` | 是否开启 Vim 键位模式。支持经典 Vim 模态编辑 (`Mod-s` 仍可用)。 |
+
+## 事件 (Events)
+
+| 事件名 | 回调参数 | 说明 |
+| --- | --- | --- |
+| `update:modelValue` | `(value: string)` | 编辑器内容发生改变时触发，用于 `v-model` 的双向绑定。 |
+
+<!-- 后续可在此添加更多事件的说明，如 focus, blur, change 等 -->
+
+## 方法 (Methods) & 实例引用 (Refs)
+
+如果需要在外部调用编辑器内置的方法，可以通过给组件添加 `ref` 来获取实例对象，调用其对外暴露的 API（例如：获取编辑器内部实例、执行特定命令等）。
+
+*(待完善 - 根据组件具体暴露的方法来补充)*
+
+<!--
+示例：
+| 属性/方法名 | 类型/签名 | 说明 |
+| --- | --- | --- |
+| `focus` | `() => void` | 使编辑器获得焦点 |
+| `getEditorView` | `() => EditorView` | 获取底层的 CodeMirror 实例 |
+-->
