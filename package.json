@@ -20,7 +20,7 @@
     "dev": "concurrently \"pnpm:dev:lib\" \"pnpm:dev:playground\" --names \"lib,playground\" --prefix-colors \"cyan,magenta\"",
     "dev:lib": "vite build --watch",
     "dev:playground": "pnpm --filter una-editor-playground dev",
-    "build": "pnpm build:types && vite build",
+    "build": "vite build && pnpm build:types",
     "build:types": "vue-tsc -p tsconfig.json",
     "build:playground": "pnpm --filter una-editor-playground build",
     "test": "vitest",
@@ -62,8 +62,16 @@
     "codemirror6",
     "markdown"
   ],
-  "author": "",
+  "author": "Charles Tang <charlestang@foxmail.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/charlestang/UnaEditor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/charlestang/UnaEditor/issues"
+  },
+  "homepage": "https://charlestang.github.io/UnaEditor/",
   "dependencies": {
     "@codemirror/commands": "^6.10.2",
     "@codemirror/lang-markdown": "^6.5.0",
