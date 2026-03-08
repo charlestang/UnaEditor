@@ -22,9 +22,27 @@ const fillHeightLayout = EditorView.theme({
   },
   '.cm-content': {
     minHeight: '100%',
+    padding: '10px 0',
   },
   '.cm-gutters': {
     minHeight: '100%',
+    backgroundColor: 'transparent',
+    borderRight: 'none',
+  },
+  '.cm-lineNumbers .cm-gutterElement': {
+    padding: '0 16px 0 4px',
+  },
+  // Better selection contrast for dark theme
+  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
+    backgroundColor: 'rgba(59, 130, 246, 0.3) !important',
+  },
+  // Subtle active line highlight
+  '.cm-activeLine': {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+  },
+  '.cm-activeLineGutter': {
+    backgroundColor: 'transparent',
+    color: '#e2e8f0',
   },
 })
 

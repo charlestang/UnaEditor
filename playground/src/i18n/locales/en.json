@@ -1,0 +1,41 @@
+{
+  "hero": {
+    "title": "A lightweight, high-performance Vue 3 editor component library based on CodeMirror 6.",
+    "getStarted": "Get Started",
+    "viewOnGithub": "View on GitHub"
+  },
+  "features": {
+    "performance": {
+      "title": "Powered by CodeMirror 6",
+      "desc": "Provides robust foundational editing capabilities and excellent performance for large documents."
+    },
+    "vue3": {
+      "title": "Vue 3 Friendly",
+      "desc": "Built entirely with the Composition API, perfectly fitting the Vue ecosystem."
+    },
+    "typeSafe": {
+      "title": "Type Safe",
+      "desc": "100% written in TypeScript with complete type inference for better developer experience."
+    },
+    "vite": {
+      "title": "Vite Driven",
+      "desc": "Lightning-fast local development and build experience powered by Vite."
+    },
+    "hybridMarkdown": {
+      "title": "Hybrid Markdown",
+      "desc": "Optional hybrid rendering mode offering instant WYSIWYG preview within the editor."
+    },
+    "vimMode": {
+      "title": "Vim Mode Support",
+      "desc": "Built-in classic Vim modal editing and keybindings for power users."
+    }
+  },
+  "demo": {
+    "title": "Interactive Demo"
+  },
+  "footer": {
+    "resources": "Resources",
+    "apiDocs": "API Documentation",
+    "community": "Community"
+  }
+}

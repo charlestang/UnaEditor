@@ -1,0 +1,41 @@
+{
+  "hero": {
+    "title": "基于 CodeMirror 6 构建的轻量级、高性能 Vue 3 编辑器组件库。",
+    "getStarted": "开始使用",
+    "viewOnGithub": "在 GitHub 上查看"
+  },
+  "features": {
+    "performance": {
+      "title": "基于 CodeMirror 6",
+      "desc": "提供强大的底层编辑能力与优异的性能，轻松应对大型文档。"
+    },
+    "vue3": {
+      "title": "Vue 3 友好",
+      "desc": "完全基于 Composition API 构建，完美契合 Vue 生态系统。"
+    },
+    "typeSafe": {
+      "title": "类型安全",
+      "desc": "100% TypeScript 编写，提供完整的类型推导，带来更好的开发体验。"
+    },
+    "vite": {
+      "title": "Vite 驱动",
+      "desc": "由 Vite 驱动，提供极速的本地开发与构建体验。"
+    },
+    "hybridMarkdown": {
+      "title": "混合 Markdown 渲染",
+      "desc": "可选的混合渲染模式，在编辑态即可获得所见即所得的即时预览。"
+    },
+    "vimMode": {
+      "title": "Vim 模式支持",
+      "desc": "内置经典的 Vim 模态编辑与键位绑定，满足硬核用户的需求。"
+    }
+  },
+  "demo": {
+    "title": "交互演示"
+  },
+  "footer": {
+    "resources": "资源",
+    "apiDocs": "API 文档",
+    "community": "社区"
+  }
+}
