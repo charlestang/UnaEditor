@@ -13,9 +13,7 @@ const goSandbox = () => {
 <template>
   <section class="hero">
     <div class="hero-content">
-      <h1 class="title">
-        <span class="highlight">Una</span> Editor
-      </h1>
+      <h1 class="title"><span class="highlight">Una</span> Editor</h1>
       <p class="subtitle">{{ t('hero.title') }}</p>
       <div class="actions">
         <button class="btn primary" @click="goSandbox">

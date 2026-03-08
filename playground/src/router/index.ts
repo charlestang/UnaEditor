@@ -7,15 +7,15 @@ const router = createRouter({
     {
       path: '/',
       name: 'Landing',
-      component: AppLanding
+      component: AppLanding,
     },
     {
       path: '/sandbox',
       name: 'Sandbox',
       // Lazy load sandbox to keep landing page fast
-      component: () => import('../views/AppSandbox.vue')
-    }
-  ]
+      component: () => import('../views/AppSandbox.vue'),
+    },
+  ],
 });
 
 export default router;

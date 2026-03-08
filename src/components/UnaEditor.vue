@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref, useAttrs } from 'vue'
-import { useEditor } from '../composables/useEditor'
-import { useFullscreen } from '../composables/useFullscreen'
-import type { EditorProps, EditorExposed } from '../types/editor'
+import { ref, useAttrs } from 'vue';
+import { useEditor } from '../composables/useEditor';
+import { useFullscreen } from '../composables/useFullscreen';
+import type { EditorProps, EditorExposed } from '../types/editor';
 
 defineOptions({
   inheritAttrs: false,
-})
+});
 
 // Define props
 const props = withDefaults(defineProps<EditorProps>(), {
@@ -17,26 +17,26 @@ const props = withDefaults(defineProps<EditorProps>(), {
   vimMode: false,
   locale: 'zh-CN',
   theme: 'light',
-})
+});
 
 // Define emits
 const emit = defineEmits<{
-  'update:modelValue': [value: string]
-  change: [value: string]
-  save: []
-  focus: []
-  blur: []
-  drop: [files: File[]]
-}>()
+  'update:modelValue': [value: string];
+  change: [value: string];
+  save: [];
+  focus: [];
+  blur: [];
+  drop: [files: File[]];
+}>();
 
-const attrs = useAttrs()
+const attrs = useAttrs();
 
 // Editor container ref
-const editorContainer = ref<HTMLElement>()
+const editorContainer = ref<HTMLElement>();
 
 // Use composables
-const { focus: editorFocus, getSelection } = useEditor(editorContainer, props, emit)
-const { toggleFullscreen, exitFullscreen } = useFullscreen(editorContainer)
+const { focus: editorFocus, getSelection } = useEditor(editorContainer, props, emit);
+const { toggleFullscreen, exitFullscreen } = useFullscreen(editorContainer);
 
 // Expose methods
 defineExpose<EditorExposed>({
@@ -44,7 +44,7 @@ defineExpose<EditorExposed>({
   getSelection,
   toggleFullscreen,
   exitFullscreen,
-})
+});
 </script>
 
 <template>

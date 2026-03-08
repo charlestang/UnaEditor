@@ -68,26 +68,30 @@ una-editor/
 - 标记任务完成状态
 - 遇到问题时暂停并寻求指导
 
-## 编码规范
+## 编码规范与最佳实践
 
-### TypeScript
+### TypeScript & Vue 组件
 
-- 启用严格模式
-- 完整的类型定义
-- 优先使用 `interface`
-- 避免 `any` 类型
+- **严格模式**: 不妥协的类型安全。优先使用 `interface`，尽量避免使用隐式的 `any`。复杂组件的 Props 必须抽离到 `src/types/` 中。
+- **Vue 3**: 强制使用 Composition API (`<script setup lang="ts">`)。
+- **Emit 声明**: 必须使用基于类型的声明 (`defineEmits<{ 'event': [arg: type] }>`) 而非数组形式。
+- **Setup 结构**: 维持严格的自上而下阅读顺序（imports -> macros -> refs -> composables -> methods -> expose）。
+- **属性透传**: 对于包装器组件，务必考虑外部 `class` 和 `style` 的透传，必要时使用 `inheritAttrs: false` 并显式绑定。
 
-### Vue 组件
+### Composables (Hook) 设计
 
-- 使用 Composition API
-- `<script setup lang="ts">`
-- 完整的 Props 类型定义
-- 清晰的文档注释
+- **传参原则**: 传递组件 `props` 给 Composable 时，必须传递完整的 `props` 对象，**绝不能在外部解构后传递**，以防丢失响应式。
+- **DOM 引用**: DOM ref 变量应以 `Ref` 或 `Container` 结尾，传递给 Composable 时类型必须为 `Ref<HTMLElement | undefined>`。
+- **清理义务**: 任何在 `onMounted` 中初始化外部实例（如 CodeMirror）或绑定事件的 Composable，必须自觉实现 `onBeforeUnmount` 钩子进行垃圾回收。
+
+### 命名风格
+
+- **布尔值**: 必须以 `is`, `has`, `can`, `should` 开头。
+- **事件处理函数**: 内部事件处理函数必须以 `handle` 前缀命名。
 
 ### 代码风格
 
 - 遵循 ESLint 和 Prettier 配置
-- 有意义的命名
 - 单一职责原则
 - 必要的注释
 

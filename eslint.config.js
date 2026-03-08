@@ -4,13 +4,8 @@ import pluginVue from 'eslint-plugin-vue';
 
 const typedFiles = ['**/*.{ts,tsx,vue}'];
 const vueFiles = ['**/*.vue'];
-const appRuntimeFiles = [
-  'src/**/*.{ts,tsx,vue}',
-  'playground/src/**/*.{ts,tsx,vue}',
-];
-const testFiles = [
-  'test/**/*.{ts,tsx,vue}',
-];
+const appRuntimeFiles = ['src/**/*.{ts,tsx,vue}', 'playground/src/**/*.{ts,tsx,vue}'];
+const testFiles = ['test/**/*.{ts,tsx,vue}'];
 const browserGlobals = {
   console: 'readonly',
   alert: 'readonly',

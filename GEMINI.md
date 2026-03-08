@@ -37,7 +37,7 @@ una-editor/
 5. **验证变更**: 使用 `openspec-verify-change` 技能验证实现是否符合预期
 6. **归档变更**: 使用 `openspec-archive-change` 技能完成并归档
 
-*当用户提出例如“开始一个新功能”、“实现当前的变更”或“帮我探索一下这个 bug”时，请主动激活对应的 OpenSpec 技能进入专家工作流。*
+_当用户提出例如“开始一个新功能”、“实现当前的变更”或“帮我探索一下这个 bug”时，请主动激活对应的 OpenSpec 技能进入专家工作流。_
 
 ## 语言与沟通规范
 
@@ -54,24 +54,40 @@ una-editor/
 `Co-Authored-By: <当前实际的模型名称> <noreply@google.com>`
 
 示例（假设当前是 Gemini 2.0 Flash）：
+
 - `feat`: add Editor component with basic functionality
 - `fix`: resolve TypeScript compilation error in index.ts
 
 `Co-Authored-By: Gemini 2.0 Flash <noreply@google.com>`
 
-**Gemini 需注意**: 
+**Gemini 需注意**:
+
 1. 在准备 Git 提交前，必须运行 `git status`、`git diff HEAD` 等命令确认变更，并提供 Draft 提交信息给用户确认，不要自动提交（除非用户明确发出 commit 指令）。
 2. **绝对不要自动将代码推送到远程仓库 (GitHub)**。即使你刚刚完成了一次 commit，也必须等待用户明确下达 `push` 或“推送到 GitHub”的指令后才能执行推送。这是为了方便用户在推送前有机会使用 rebase/squash 整理提交历史。
 
 ## 编码规范与最佳实践
 
 ### TypeScript & Vue 组件
-- **严格模式**: 不妥协的类型安全。优先使用 `interface`，尽量避免使用隐式的 `any`。
+
+- **严格模式**: 不妥协的类型安全。优先使用 `interface`，尽量避免使用隐式的 `any`。复杂组件的 Props 必须抽离到 `src/types/` 中。
 - **Vue 3**: 强制使用 Composition API (`<script setup lang="ts">`)。
-- **Props**: 所有组件的 Props 必须有严谨的类型定义。
-- **单一职责**: 保持函数和组件简短、单一职责，逻辑复杂时抽离到 `composables/` 或单独的文件中。
+- **Emit 声明**: 必须使用基于类型的声明 (`defineEmits<{ 'event': [arg: type] }>`) 而非数组形式。
+- **Setup 结构**: 维持严格的自上而下阅读顺序（imports -> macros -> refs -> composables -> methods -> expose）。
+- **属性透传**: 对于包装器组件，务必考虑外部 `class` 和 `style` 的透传，必要时使用 `inheritAttrs: false` 并显式绑定。
+
+### Composables (Hook) 设计
+
+- **传参原则**: 传递组件 `props` 给 Composable 时，必须传递完整的 `props` 对象，**绝不能在外部解构后传递**，以防丢失响应式。
+- **DOM 引用**: DOM ref 变量应以 `Ref` 或 `Container` 结尾，传递给 Composable 时类型必须为 `Ref<HTMLElement | undefined>`。
+- **清理义务**: 任何在 `onMounted` 中初始化外部实例（如 CodeMirror）或绑定事件的 Composable，必须自觉实现 `onBeforeUnmount` 钩子进行垃圾回收。
+
+### 命名风格
+
+- **布尔值**: 必须以 `is`, `has`, `can`, `should` 开头。
+- **事件处理函数**: 内部事件处理函数必须以 `handle` 前缀命名。
 
 ### 构建与测试
+
 - **依赖管理**: `vue` 在主包中作为 `peerDependency`（外部依赖）。不要在主库中把 vue 锁定在 `dependencies` 中。
 - **验证原则**: “未经验证的变更是不完整的”。在修改代码后，必须使用 `pnpm lint`、`pnpm test` 或通过 `playground` (本地开发服务器) 验证变更的有效性。
 - **Playground 开发**: Playground 是一个独立的 Vite 应用 (`workspace:*` 引用主包)。开发新功能时，需确保能在 Playground 中正确演示与测试。

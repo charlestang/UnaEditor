@@ -13,6 +13,7 @@
 ## Capabilities
 
 ### New Capabilities
+
 - `hybrid-markdown-rendering`: 为编辑器提供可开关的 hybrid Markdown 渲染能力，在渲染态与源码态之间按光标位置切换，并覆盖首期约定的 Markdown 结构显示行为。
 
 ### Modified Capabilities

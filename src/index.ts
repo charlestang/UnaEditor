@@ -1,8 +1,8 @@
 // Main entry point for una-editor package
-export const version = '0.1.0'
+export const version = '0.1.0';
 
 // Export UnaEditor component
-export { default as UnaEditor } from './components/UnaEditor.vue'
+export { default as UnaEditor } from './components/UnaEditor.vue';
 
 // Export types
 export type {
@@ -11,8 +11,7 @@ export type {
   EditorExposed,
   CustomLocale,
   Locale,
-} from './types/editor'
+} from './types/editor';
 
 // Export locale utilities
-export { locales, defaultLocale, defineLocale, zhCN, enUS } from './locales'
-
+export { locales, defaultLocale, defineLocale, zhCN, enUS } from './locales';

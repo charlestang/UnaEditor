@@ -20,7 +20,11 @@ const { t } = useI18n();
       <div class="links">
         <div class="link-group">
           <h4 class="group-title">{{ t('footer.resources') }}</h4>
-          <a href="https://github.com/charlestang/UnaEditor/blob/main/docs/api.md" target="_blank">{{ t('footer.apiDocs') }}</a>
+          <a
+            href="https://github.com/charlestang/UnaEditor/blob/main/docs/api.md"
+            target="_blank"
+            >{{ t('footer.apiDocs') }}</a
+          >
           <a href="https://github.com/charlestang/UnaEditor/issues" target="_blank">Issues</a>
         </div>
         <div class="link-group">
@@ -100,7 +104,7 @@ const { t } = useI18n();
   .footer-container {
     flex-direction: column;
   }
-  
+
   .links {
     gap: 2rem;
     flex-wrap: wrap;

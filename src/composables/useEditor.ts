@@ -1,17 +1,12 @@
-import { ref, watch, onMounted, onBeforeUnmount, type Ref } from 'vue'
-import { EditorState, Compartment, Prec } from '@codemirror/state'
-import {
-  EditorView,
-  keymap,
-  placeholder as placeholderExt,
-  lineNumbers,
-} from '@codemirror/view'
-import { defaultKeymap } from '@codemirror/commands'
-import { markdown } from '@codemirror/lang-markdown'
-import { oneDark } from '@codemirror/theme-one-dark'
-import { vim } from '@replit/codemirror-vim'
-import { createHybridMarkdownExtensions } from '../extensions/hybridMarkdown'
-import type { EditorProps } from '../types/editor'
+import { ref, watch, onMounted, onBeforeUnmount, type Ref } from 'vue';
+import { EditorState, Compartment, Prec } from '@codemirror/state';
+import { EditorView, keymap, placeholder as placeholderExt, lineNumbers } from '@codemirror/view';
+import { defaultKeymap } from '@codemirror/commands';
+import { markdown } from '@codemirror/lang-markdown';
+import { oneDark } from '@codemirror/theme-one-dark';
+import { vim } from '@replit/codemirror-vim';
+import { createHybridMarkdownExtensions } from '../extensions/hybridMarkdown';
+import type { EditorProps } from '../types/editor';
 
 const fillHeightLayout = EditorView.theme({
   '&': {
@@ -44,46 +39,46 @@ const fillHeightLayout = EditorView.theme({
     backgroundColor: 'transparent',
     color: '#e2e8f0',
   },
-})
+});
 
 export function useEditor(
   container: Ref<HTMLElement | undefined>,
   props: EditorProps,
   emit: {
-    (e: 'update:modelValue', value: string): void
-    (e: 'change', value: string): void
-    (e: 'save'): void
-    (e: 'focus'): void
-    (e: 'blur'): void
-    (e: 'drop', files: File[]): void
-  }
+    (e: 'update:modelValue', value: string): void;
+    (e: 'change', value: string): void;
+    (e: 'save'): void;
+    (e: 'focus'): void;
+    (e: 'blur'): void;
+    (e: 'drop', files: File[]): void;
+  },
 ) {
-  const editorView = ref<EditorView>()
-  let isInternalUpdate = false
+  const editorView = ref<EditorView>();
+  let isInternalUpdate = false;
 
   // Compartments for dynamic reconfiguration
-  const themeCompartment = new Compartment()
-  const hybridCompartment = new Compartment()
-  const vimCompartment = new Compartment()
-  const lineNumbersCompartment = new Compartment()
-  const placeholderCompartment = new Compartment()
-  const readOnlyCompartment = new Compartment()
+  const themeCompartment = new Compartment();
+  const hybridCompartment = new Compartment();
+  const vimCompartment = new Compartment();
+  const lineNumbersCompartment = new Compartment();
+  const placeholderCompartment = new Compartment();
+  const readOnlyCompartment = new Compartment();
 
   // Extract image files from DataTransfer
   function extractImageFiles(dataTransfer: DataTransfer): File[] {
-    const files: File[] = []
+    const files: File[] = [];
     for (let i = 0; i < dataTransfer.files.length; i++) {
-      const file = dataTransfer.files[i]
+      const file = dataTransfer.files[i];
       if (file.type.startsWith('image/')) {
-        files.push(file)
+        files.push(file);
       }
     }
-    return files
+    return files;
   }
 
   // Initialize EditorView
   onMounted(() => {
-    if (!container.value) return
+    if (!container.value) return;
 
     const extensions = [
       // Basic keymap
@@ -96,11 +91,11 @@ export function useEditor(
             key: 'Mod-s',
             preventDefault: true,
             run: () => {
-              emit('save')
-              return true
+              emit('save');
+              return true;
             },
           },
-        ])
+        ]),
       ),
 
       // Markdown language support
@@ -127,45 +122,45 @@ export function useEditor(
       // Update listener for v-model
       EditorView.updateListener.of((update) => {
         if (update.docChanged && !isInternalUpdate) {
-          const value = update.state.doc.toString()
-          emit('update:modelValue', value)
-          emit('change', value)
+          const value = update.state.doc.toString();
+          emit('update:modelValue', value);
+          emit('change', value);
         }
       }),
 
       // Focus/blur handlers
       EditorView.domEventHandlers({
         focus: () => {
-          emit('focus')
+          emit('focus');
         },
         blur: () => {
-          emit('blur')
+          emit('blur');
         },
         // Image drag handler
         drop: (event) => {
-          const files = extractImageFiles(event.dataTransfer!)
+          const files = extractImageFiles(event.dataTransfer!);
           if (files.length > 0) {
-            event.preventDefault()
-            emit('drop', files)
-            return true
+            event.preventDefault();
+            emit('drop', files);
+            return true;
           }
-          return false
+          return false;
         },
         // Image paste handler
         paste: (event) => {
-          const files = extractImageFiles(event.clipboardData!)
+          const files = extractImageFiles(event.clipboardData!);
           if (files.length > 0) {
-            event.preventDefault()
-            emit('drop', files)
-            return true
+            event.preventDefault();
+            emit('drop', files);
+            return true;
           }
-          return false
+          return false;
         },
       }),
 
       // Disabled/readonly state (dynamic)
       readOnlyCompartment.of(EditorState.readOnly.of(props.disabled || props.readonly || false)),
-    ]
+    ];
 
     editorView.value = new EditorView({
       state: EditorState.create({
@@ -173,115 +168,119 @@ export function useEditor(
         extensions,
       }),
       parent: container.value,
-    })
-  })
+    });
+  });
 
   // Watch modelValue prop and update EditorView
   watch(
     () => props.modelValue,
     (newValue) => {
-      if (!editorView.value) return
-      const currentValue = editorView.value.state.doc.toString()
+      if (!editorView.value) return;
+      const currentValue = editorView.value.state.doc.toString();
       if (newValue !== currentValue) {
-        isInternalUpdate = true
+        isInternalUpdate = true;
         editorView.value.dispatch({
           changes: {
             from: 0,
             to: currentValue.length,
             insert: newValue,
           },
-        })
-        isInternalUpdate = false
+        });
+        isInternalUpdate = false;
       }
-    }
-  )
+    },
+  );
 
   // Watch theme prop and update dynamically
   watch(
     () => props.theme,
     (newTheme) => {
-      if (!editorView.value) return
+      if (!editorView.value) return;
       editorView.value.dispatch({
         effects: themeCompartment.reconfigure(newTheme === 'dark' ? oneDark : []),
-      })
-    }
-  )
+      });
+    },
+  );
 
   // Watch hybridMarkdown prop and update dynamically
   watch(
     () => props.hybridMarkdown,
     (enabled) => {
-      if (!editorView.value) return
+      if (!editorView.value) return;
       editorView.value.dispatch({
         effects: hybridCompartment.reconfigure(enabled ? createHybridMarkdownExtensions() : []),
-      })
-    }
-  )
+      });
+    },
+  );
 
   // Watch vimMode prop and update dynamically
   watch(
     () => props.vimMode,
     (enabled) => {
-      if (!editorView.value) return
+      if (!editorView.value) return;
       editorView.value.dispatch({
         effects: vimCompartment.reconfigure(enabled ? vim({ status: false }) : []),
-      })
-    }
-  )
+      });
+    },
+  );
 
   // Watch lineNumbers prop and update dynamically
   watch(
     () => props.lineNumbers,
     (showLineNumbers) => {
-      if (!editorView.value) return
+      if (!editorView.value) return;
       editorView.value.dispatch({
         effects: lineNumbersCompartment.reconfigure(showLineNumbers !== false ? lineNumbers() : []),
-      })
-    }
-  )
+      });
+    },
+  );
 
   // Watch placeholder prop and update dynamically
   watch(
     () => props.placeholder,
     (newPlaceholder) => {
-      if (!editorView.value) return
+      if (!editorView.value) return;
       editorView.value.dispatch({
-        effects: placeholderCompartment.reconfigure(newPlaceholder ? placeholderExt(newPlaceholder) : []),
-      })
-    }
-  )
+        effects: placeholderCompartment.reconfigure(
+          newPlaceholder ? placeholderExt(newPlaceholder) : [],
+        ),
+      });
+    },
+  );
 
   // Watch disabled/readonly props and update dynamically
   watch(
     () => [props.disabled, props.readonly] as const,
     ([disabled, readonly]) => {
-      if (!editorView.value) return
+      if (!editorView.value) return;
       editorView.value.dispatch({
-        effects: readOnlyCompartment.reconfigure(EditorState.readOnly.of(disabled || readonly || false)),
-      })
-    }
-  )
+        effects: readOnlyCompartment.reconfigure(
+          EditorState.readOnly.of(disabled || readonly || false),
+        ),
+      });
+    },
+  );
 
   // Cleanup EditorView
   onBeforeUnmount(() => {
-    editorView.value?.destroy()
-  })
+    editorView.value?.destroy();
+  });
 
   // Exposed methods
   const focus = () => {
-    editorView.value?.focus()
-  }
+    editorView.value?.focus();
+  };
 
   const getSelection = (): string => {
-    if (!editorView.value) return ''
-    const state = editorView.value.state
-    const selection = state.selection.main
-    return state.doc.sliceString(selection.from, selection.to)
-  }
+    if (!editorView.value) return '';
+    const state = editorView.value.state;
+    const selection = state.selection.main;
+    return state.doc.sliceString(selection.from, selection.to);
+  };
 
   return {
     editorView,
     focus,
     getSelection,
-  }
+  };
 }

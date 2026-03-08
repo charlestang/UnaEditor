@@ -27,10 +27,12 @@ UnaEditor 需要一个核心的编辑器组件来提供 Markdown 编辑功能。
 ## Impact
 
 **新增依赖**:
+
 - CodeMirror 6 核心包和 Markdown 语言支持
 - 可能需要的 CodeMirror 扩展（行号、快捷键、主题等）
 
 **新增文件**:
+
 - `src/components/UnaEditor.vue` - 主编辑器组件
 - `src/composables/useEditor.ts` - 编辑器逻辑复用
 - `src/composables/useFullscreen.ts` - 全屏功能复用
@@ -38,6 +40,7 @@ UnaEditor 需要一个核心的编辑器组件来提供 Markdown 编辑功能。
 - `src/types/editor.ts` - 编辑器相关类型定义
 
 **影响范围**:
+
 - Playground 需要添加 UnaEditor 组件的演示页面
 - Playground 需要配置 eslint、format、typecheck 脚本
 - package.json 需要添加 CodeMirror 6 相关依赖

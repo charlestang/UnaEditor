@@ -9,7 +9,7 @@ const features = [
   { icon: '💪', key: 'typeSafe' },
   { icon: '⚡️', key: 'vite' },
   { icon: '📝', key: 'hybridMarkdown' },
-  { icon: '⌨️', key: 'vimMode' }
+  { icon: '⌨️', key: 'vimMode' },
 ];
 </script>
 
@@ -44,7 +44,9 @@ const features = [
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 1rem;
   padding: 2rem;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
 }
 
 .feature-card:hover {

@@ -103,6 +103,6 @@
 - [x] 10.3 复用 tsconfig.json 用于类型声明生成
 - [x] 10.4 使用 Compartment API 实现 theme、lineNumbers 等 props 的响应式更新
 - [x] 10.5 修正全屏模式实现（browser=CSS viewport, screen=Fullscreen API）
-- [x] 10.6 修复 vite.config.ts 的 lint 错误（path 和 __dirname）
+- [x] 10.6 修复 vite.config.ts 的 lint 错误（path 和 \_\_dirname）
 - [x] 10.7 在 tsconfig.json 中添加 DOM 类型库配置
 - [x] 10.8 组件重命名为 UnaEditor 以符合 Vue 3 多单词命名规范

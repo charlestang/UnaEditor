@@ -27,10 +27,13 @@
 ## 📦 安装
 
 使用 pnpm (推荐):
+
 ```bash
 pnpm add una-editor
 ```
+
 或使用 npm / yarn:
+
 ```bash
 npm install una-editor
 # 或
@@ -48,11 +51,7 @@ const content = ref('# Hello Una Editor!');
 </script>
 
 <template>
-  <UnaEditor 
-    v-model="content"
-    :hybrid-markdown="true" 
-    :vim-mode="false" 
-  />
+  <UnaEditor v-model="content" :hybrid-markdown="true" :vim-mode="false" />
 </template>
 ```
 
@@ -71,6 +70,7 @@ pnpm install
 # 启动本地开发与 Playground
 pnpm dev
 ```
+
 访问 `http://localhost:5173` 即可查看本地调试效果。
 
 ### 其他常用命令
@@ -95,6 +95,7 @@ una-editor/
 ## 🤝 参与贡献
 
 欢迎提交 Pull Request 或开设 Issue 讨论新特性与 Bug。在提交代码前，请确保：
+
 1. 运行 `pnpm lint` 和 `pnpm test` 通过所有检查。
 2. 遵循现有的代码规范与 [Conventional Commits](https://www.conventionalcommits.org/) 提交信息格式。
 3. 较大的功能变更，请先查阅 `openspec/` 目录下的设计规范流程。

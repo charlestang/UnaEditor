@@ -30,7 +30,6 @@ const content = ref('Hello World');
 
 > Enjoy building amazing things! 🚀
 `);
-
 </script>
 
 <template>
@@ -113,7 +112,9 @@ const content = ref('Hello World');
   background: #282c34; /* Match One Dark theme background */
   border-radius: 0.75rem;
   overflow: hidden;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.5),
+    0 8px 10px -6px rgba(0, 0, 0, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.1);
   height: 500px;
 }

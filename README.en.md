@@ -27,10 +27,13 @@ A lightweight, high-performance Vue 3 editor component library based on CodeMirr
 ## 📦 Installation
 
 Using pnpm (recommended):
+
 ```bash
 pnpm add una-editor
 ```
+
 Or using npm / yarn:
+
 ```bash
 npm install una-editor
 # or
@@ -48,11 +51,7 @@ const content = ref('# Hello Una Editor!');
 </script>
 
 <template>
-  <UnaEditor 
-    v-model="content"
-    :hybrid-markdown="true" 
-    :vim-mode="false" 
-  />
+  <UnaEditor v-model="content" :hybrid-markdown="true" :vim-mode="false" />
 </template>
 ```
 
@@ -71,6 +70,7 @@ pnpm install
 # Start local development and Playground
 pnpm dev
 ```
+
 Visit `http://localhost:5173` to see the local debugging effect.
 
 ### Other Useful Commands
@@ -95,6 +95,7 @@ una-editor/
 ## 🤝 Contributing
 
 Pull Requests and Issues discussing new features or bugs are highly welcome. Before submitting code, please ensure:
+
 1. All checks pass by running `pnpm lint` and `pnpm test`.
 2. Follow existing code formatting and [Conventional Commits](https://www.conventionalcommits.org/) message formats.
 3. For major feature changes, please refer to the design specification process in the `openspec/` directory first.

@@ -13,10 +13,12 @@
 ## Capabilities
 
 ### New Capabilities
+
 - `project-landing-page`: 开源产品落地页的展示功能，包括 Hero 视觉区、特性网格、中英双语支持，以及可交互的编辑器 Demo 区。
 - `playground-sandbox`: 纯净的编辑器开发调试环境，通过独立的路由隔离落地页的复杂样式干扰。
 
 ### Modified Capabilities
+
 无。
 
 ## Impact
