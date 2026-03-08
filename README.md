@@ -2,12 +2,17 @@
 
 [English](./README.en.md) | [简体中文](./README.md)
 
-[![npm version](https://img.shields.io/npm/v/una-editor.svg)](https://www.npmjs.com/package/una-editor)
-[![license](https://img.shields.io/npm/l/una-editor.svg)](https://github.com/charlestang/una-editor/blob/main/LICENSE)
+[![npm version](https://img.shields.io/npm/v/una-editor.svg?color=blue)](https://www.npmjs.com/package/una-editor)
+[![license](https://img.shields.io/github/license/charlestang/UnaEditor)](https://github.com/charlestang/UnaEditor/blob/main/LICENSE)
+[![Vue](https://img.shields.io/badge/Vue.js-35495E?logo=vue.js&logoColor=4FC08D)](https://vuejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![CodeMirror](https://img.shields.io/badge/CodeMirror-C53929?logo=codemirror&logoColor=white)](https://codemirror.net/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/charlestang/UnaEditor/pulls)
 
 基于 CodeMirror 6 构建的轻量级、高性能 Vue 3 编辑器组件库。
 
-[在线演示 (Live Demo) 🚀](#) <!-- 替换为你的实际在线演示地址 -->
+[**在线演示 (Live Demo) 🚀**](https://charlestang.github.io/UnaEditor/)
 
 ## ✨ 特性
 

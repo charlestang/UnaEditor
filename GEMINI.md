@@ -49,17 +49,19 @@ una-editor/
 
 ### Git 提交规范示例
 
-必须是英文，格式为 `<type>: <subject>`，结尾无句号。**所有由 Gemini 生成或参与的 Commit 必须在消息末尾包含以下署名：**
+必须是英文，格式为 `<type>: <subject>`，结尾无句号。**所有由 Gemini 生成或参与的 Commit 必须在消息末尾包含以下署名，并且必须动态填入你当前实际正在使用的模型名称（例如，如果你是 Gemini 3，就写 Gemini 3）：**
 
-`Co-Authored-By: Gemini 2.0 Flash <noreply@google.com>`
+`Co-Authored-By: <当前实际的模型名称> <noreply@google.com>`
 
-示例：
+示例（假设当前是 Gemini 2.0 Flash）：
 - `feat`: add Editor component with basic functionality
 - `fix`: resolve TypeScript compilation error in index.ts
 
 `Co-Authored-By: Gemini 2.0 Flash <noreply@google.com>`
 
-**Gemini 需注意**: 在准备 Git 提交前，必须运行 `git status`、`git diff HEAD` 等命令确认变更，并提供 Draft 提交信息给用户确认，不要自动提交（除非用户明确发出 commit 指令）。
+**Gemini 需注意**: 
+1. 在准备 Git 提交前，必须运行 `git status`、`git diff HEAD` 等命令确认变更，并提供 Draft 提交信息给用户确认，不要自动提交（除非用户明确发出 commit 指令）。
+2. **绝对不要自动将代码推送到远程仓库 (GitHub)**。即使你刚刚完成了一次 commit，也必须等待用户明确下达 `push` 或“推送到 GitHub”的指令后才能执行推送。这是为了方便用户在推送前有机会使用 rebase/squash 整理提交历史。
 
 ## 编码规范与最佳实践
 
