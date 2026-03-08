@@ -3,10 +3,11 @@ import { EditorState, Compartment, Prec } from '@codemirror/state';
 import { EditorView, keymap, placeholder as placeholderExt, lineNumbers } from '@codemirror/view';
 import { defaultKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
+import { syntaxTree } from '@codemirror/language';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { vim } from '@replit/codemirror-vim';
 import { createHybridMarkdownExtensions } from '../extensions/hybridMarkdown';
-import type { EditorProps } from '../types/editor';
+import type { EditorProps, Heading } from '../types/editor';
 
 const fillHeightLayout = EditorView.theme({
   '&': {
@@ -278,9 +279,72 @@ export function useEditor(
     return state.doc.sliceString(selection.from, selection.to);
   };
 
+  const getEditorView = (): EditorView | undefined => {
+    return editorView.value;
+  };
+
+  const insertText = (text: string) => {
+    if (!editorView.value) return;
+    const view = editorView.value;
+    const selection = view.state.selection.main;
+    
+    isInternalUpdate = true;
+    view.dispatch({
+      changes: {
+        from: selection.from,
+        to: selection.to,
+        insert: text,
+      },
+      selection: { anchor: selection.from + text.length },
+      scrollIntoView: true,
+    });
+    isInternalUpdate = false;
+  };
+
+  const getHeadings = (): Heading[] => {
+    if (!editorView.value) return [];
+    const state = editorView.value.state;
+    const tree = syntaxTree(state);
+    const headings: Heading[] = [];
+
+    tree.iterate({
+      enter: (node) => {
+        if (node.name.startsWith('ATXHeading')) {
+          const levelMatch = node.name.match(/\d$/);
+          const level = levelMatch ? parseInt(levelMatch[0], 10) : 1;
+          // Extract text without the leading '#' and spaces
+          const rawText = state.doc.sliceString(node.from, node.to);
+          const text = rawText.replace(/^#+\s*/, '').trim();
+          const line = state.doc.lineAt(node.from).number;
+          
+          headings.push({ text, level, line });
+        }
+      },
+    });
+
+    return headings;
+  };
+
+  const scrollToLine = (lineNumber: number) => {
+    if (!editorView.value) return;
+    const doc = editorView.value.state.doc;
+    
+    if (lineNumber < 1) lineNumber = 1;
+    if (lineNumber > doc.lines) lineNumber = doc.lines;
+    
+    const line = doc.line(lineNumber);
+    editorView.value.dispatch({
+      effects: EditorView.scrollIntoView(line.from, { y: 'start', yMargin: 20 })
+    });
+  };
+
   return {
     editorView,
     focus,
     getSelection,
+    getEditorView,
+    insertText,
+    getHeadings,
+    scrollToLine,
   };
 }

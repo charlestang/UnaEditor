@@ -22,14 +22,15 @@ This document lists the properties, events, and exposed methods provided by the 
 
 ## Methods & Expose / Refs
 
-If you need to call the editor's built-in methods externally, you can add a `ref` to the component to get the instance object and call its exposed API (e.g., getting the internal editor instance, executing specific commands, etc.).
+If you need to call the editor's built-in methods externally, you can add a `ref` to the component to get the instance object and call its exposed API.
 
-_(To be completed - Add based on the specific methods exposed by the component)_
-
-<!--
-Example:
-| Property/Method Name | Type/Signature | Description |
+| Method Name | Type/Signature | Description |
 | --- | --- | --- |
-| `focus` | `() => void` | Focuses the editor |
-| `getEditorView` | `() => EditorView` | Gets the underlying CodeMirror instance |
--->
+| `focus` | `() => void` | Focuses the editor. |
+| `getSelection` | `() => string` | Gets the currently selected text. Returns an empty string if nothing is selected. |
+| `insertText` | `(text: string) => void` | Inserts text at the current cursor position. If a selection exists, it will be replaced. The cursor is moved to the end of the inserted text. |
+| `getHeadings` | `() => Array<{ text: string, level: number, line: number }>` | Extracts all Markdown headings from the document using internal AST parsing. Returns an array containing the text, level, and line number of each heading, perfect for building a Table of Contents (TOC). |
+| `scrollToLine` | `(lineNumber: number) => void` | Smoothly scrolls the editor viewport so that the specified 1-based line number becomes visible. |
+| `toggleFullscreen` | `(mode?: 'browser' \| 'screen') => void` | Toggles fullscreen mode (supports filling the browser viewport or the entire screen via native API). |
+| `exitFullscreen` | `() => void` | Exits fullscreen mode. |
+| `getEditorView` | `() => EditorView \| undefined` | [Advanced] Gets the underlying CodeMirror 6 `EditorView` instance. Can be used for deep custom extensions (Note: manipulating the document directly may cause Vue's `v-model` state to desync). |

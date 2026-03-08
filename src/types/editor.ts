@@ -1,3 +1,5 @@
+import type { EditorView } from '@codemirror/view';
+
 // Editor component props
 export interface EditorProps {
   modelValue: string;
@@ -22,12 +24,23 @@ export interface EditorEvents {
   drop: (files: File[]) => void;
 }
 
+// Heading structure for TOC extraction
+export interface Heading {
+  text: string;
+  level: number;
+  line: number;
+}
+
 // Editor exposed methods
 export interface EditorExposed {
   focus: () => void;
   getSelection: () => string;
   toggleFullscreen: (mode?: 'browser' | 'screen') => void;
   exitFullscreen: () => void;
+  getEditorView: () => EditorView | undefined;
+  insertText: (text: string) => void;
+  getHeadings: () => Heading[];
+  scrollToLine: (lineNumber: number) => void;
 }
 
 // Locale types

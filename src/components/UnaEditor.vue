@@ -35,7 +35,14 @@ const attrs = useAttrs();
 const editorContainer = ref<HTMLElement>();
 
 // Use composables
-const { focus: editorFocus, getSelection } = useEditor(editorContainer, props, emit);
+const {
+  focus: editorFocus,
+  getSelection,
+  getEditorView,
+  insertText,
+  getHeadings,
+  scrollToLine,
+} = useEditor(editorContainer, props, emit);
 const { toggleFullscreen, exitFullscreen } = useFullscreen(editorContainer);
 
 // Expose methods
@@ -44,6 +51,10 @@ defineExpose<EditorExposed>({
   getSelection,
   toggleFullscreen,
   exitFullscreen,
+  getEditorView,
+  insertText,
+  getHeadings,
+  scrollToLine,
 });
 </script>
 

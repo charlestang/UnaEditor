@@ -361,7 +361,7 @@ describe('UnaEditor', () => {
     expect(wrapper.find('.cm-content').element.textContent).toContain('| head | value |');
   });
 
-  it('exposes focus and getSelection methods', () => {
+  it('exposes programmable API methods', () => {
     const wrapper = mount(UnaEditor, {
       props: {
         modelValue: '',
@@ -371,5 +371,83 @@ describe('UnaEditor', () => {
     expect(wrapper.vm.getSelection).toBeDefined();
     expect(wrapper.vm.toggleFullscreen).toBeDefined();
     expect(wrapper.vm.exitFullscreen).toBeDefined();
+    expect(wrapper.vm.getEditorView).toBeDefined();
+    expect(wrapper.vm.insertText).toBeDefined();
+    expect(wrapper.vm.getHeadings).toBeDefined();
+    expect(wrapper.vm.scrollToLine).toBeDefined();
+  });
+
+  it('can insert text at the cursor position', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: 'hello ',
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    
+    // Set cursor to the end
+    view.dispatch({ selection: { anchor: 6 } });
+    
+    wrapper.vm.insertText!('world');
+    
+    expect(view.state.doc.toString()).toBe('hello world');
+    // Cursor should move to end of inserted text
+    expect(view.state.selection.main.anchor).toBe(11);
+  });
+
+  it('can replace the current selection with new text', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: 'hello old world',
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    
+    // Select 'old '
+    view.dispatch({ selection: { anchor: 6, head: 10 } });
+    
+    wrapper.vm.insertText!('new ');
+    
+    expect(view.state.doc.toString()).toBe('hello new world');
+    expect(view.state.selection.main.anchor).toBe(10); // 6 + 4
+  });
+
+  it('extracts headings to build an outline', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '# H1 Title\nSome text\n## H2 Subtitle\nMore text\n### H3 Deep\n',
+      },
+    });
+
+    // Wait for the syntax tree to parse
+    await getEditorView(wrapper);
+    // Give CM a tick to build syntax tree
+    await nextTick();
+    
+    const headings = wrapper.vm.getHeadings!();
+    
+    expect(headings).toEqual([
+      { text: 'H1 Title', level: 1, line: 1 },
+      { text: 'H2 Subtitle', level: 2, line: 3 },
+      { text: 'H3 Deep', level: 3, line: 5 },
+    ]);
+  });
+
+  it('returns the underlying EditorView instance', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: 'hello test',
+      },
+    });
+
+    const internalView = await getEditorView(wrapper);
+    const exposedView = wrapper.vm.getEditorView!();
+    
+    expect(exposedView).toBeDefined();
+    // Verify it's the same actual editor state/doc
+    expect(exposedView?.state.doc.toString()).toBe(internalView.state.doc.toString());
+    expect(exposedView?.dom).toBe(internalView.dom);
   });
 });

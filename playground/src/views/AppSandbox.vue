@@ -53,6 +53,31 @@ const toggleScreenFullscreen = () => {
 const exitFullscreen = () => {
   editorRef.value?.exitFullscreen();
 };
+
+const handleInsertText = () => {
+  editorRef.value?.insertText('🚀 [Inserted Text] ');
+  editorRef.value?.focus();
+};
+
+const showHeadings = () => {
+  const headings = editorRef.value?.getHeadings();
+  if (!headings || headings.length === 0) {
+    alert('No headings found.');
+    return;
+  }
+  const tree = headings.map(h => `${'  '.repeat(h.level - 1)}- [H${h.level}] ${h.text} (Line ${h.line})`).join('\n');
+  alert(`Document TOC:\n\n${tree}`);
+};
+
+const testScrollToLine = () => {
+  const lineStr = prompt('Enter a line number to scroll to:', '10');
+  if (lineStr) {
+    const line = parseInt(lineStr, 10);
+    if (!isNaN(line)) {
+      editorRef.value?.scrollToLine(line);
+    }
+  }
+};
 </script>
 
 <template>
@@ -102,6 +127,11 @@ const exitFullscreen = () => {
     <div class="controls">
       <button @click="focusEditor">聚焦编辑器</button>
       <button @click="getSelectedText">获取选中文本</button>
+      <button @click="handleInsertText">插入文本</button>
+      <button @click="showHeadings">提取大纲 (TOC)</button>
+      <button @click="testScrollToLine">滚动到某行</button>
+    </div>
+    <div class="controls">
       <button @click="toggleBrowserFullscreen">浏览器全屏</button>
       <button @click="toggleScreenFullscreen">屏幕全屏</button>
       <button @click="exitFullscreen">退出全屏</button>
