@@ -49,11 +49,15 @@ una-editor/
 
 ### Git 提交规范示例
 
-必须是英文，格式为 `<type>: <subject>`，结尾无句号：
+必须是英文，格式为 `<type>: <subject>`，结尾无句号。**所有由 Gemini 生成或参与的 Commit 必须在消息末尾包含以下署名：**
+
+`Co-Authored-By: Gemini 2.0 Flash <noreply@google.com>`
+
+示例：
 - `feat`: add Editor component with basic functionality
 - `fix`: resolve TypeScript compilation error in index.ts
-- `chore`: update vite to 7.3.1
-- `refactor`: simplify component props interface
+
+`Co-Authored-By: Gemini 2.0 Flash <noreply@google.com>`
 
 **Gemini 需注意**: 在准备 Git 提交前，必须运行 `git status`、`git diff HEAD` 等命令确认变更，并提供 Draft 提交信息给用户确认，不要自动提交（除非用户明确发出 commit 指令）。
 
