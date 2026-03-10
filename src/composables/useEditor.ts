@@ -348,9 +348,27 @@ export function useEditor(
     if (lineNumber > doc.lines) lineNumber = doc.lines;
 
     const line = doc.line(lineNumber);
-    editorView.value.dispatch({
-      effects: EditorView.scrollIntoView(line.from, { y: 'start', yMargin: 20 })
-    });
+    const view = editorView.value;
+    const isFocused = view.hasFocus;
+
+    // Use lineBlockAt to get the visual position of the line
+    // This works regardless of whether content is hidden by decorations
+    const lineBlock = view.lineBlockAt(line.from);
+    const scrollDOM = view.scrollDOM;
+
+    // lineBlock.top is already relative to the scrollable content area
+    // Just subtract the margin to get the target scroll position
+    const targetScrollTop = lineBlock.top - 5;
+
+    // Directly set scrollTop to force scroll to exact position
+    scrollDOM.scrollTop = Math.max(0, targetScrollTop);
+
+    // Move cursor if focused
+    if (isFocused) {
+      view.dispatch({
+        selection: { anchor: line.from },
+      });
+    }
   };
 
   return {

@@ -1,6 +1,9 @@
 import { ref, onMounted, onBeforeUnmount, type Ref } from 'vue';
 
-export function useFullscreen(container: Ref<HTMLElement | undefined>) {
+export function useFullscreen(
+  container: Ref<HTMLElement | undefined>,
+  onBrowserFullscreenEnter?: () => void,
+) {
   const isFullscreen = ref(false);
   const fullscreenMode = ref<'browser' | 'screen' | null>(null);
 
@@ -14,6 +17,8 @@ export function useFullscreen(container: Ref<HTMLElement | undefined>) {
         container.value.classList.add('una-editor-fullscreen-browser');
         isFullscreen.value = true;
         fullscreenMode.value = 'browser';
+        // Trigger callback to show tip
+        onBrowserFullscreenEnter?.();
       } else {
         container.value.classList.remove('una-editor-fullscreen-browser');
         isFullscreen.value = false;
@@ -59,12 +64,21 @@ export function useFullscreen(container: Ref<HTMLElement | undefined>) {
     }
   };
 
+  // Handle ESC key to exit browser fullscreen
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && fullscreenMode.value === 'browser') {
+      exitFullscreen();
+    }
+  };
+
   onMounted(() => {
     document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('keydown', handleKeyDown);
   });
 
   onBeforeUnmount(() => {
     document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    document.removeEventListener('keydown', handleKeyDown);
   });
 
   return {

@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, useAttrs } from 'vue';
+import { ref, useAttrs, computed } from 'vue';
 import { useEditor } from '../composables/useEditor';
 import { useFullscreen } from '../composables/useFullscreen';
 import type { EditorProps, EditorExposed } from '../types/editor';
+import zhCN from '../locales/zh-CN';
+import enUS from '../locales/en-US';
 
 defineOptions({
   inheritAttrs: false,
@@ -35,6 +37,26 @@ const attrs = useAttrs();
 // Editor container ref
 const editorContainer = ref<HTMLElement>();
 
+// Fullscreen tip state
+const showFullscreenTip = ref(false);
+
+// Get locale messages
+const localeMessages = computed(() => {
+  if (typeof props.locale === 'string') {
+    return props.locale === 'en-US' ? enUS : zhCN;
+  }
+  return props.locale || zhCN;
+});
+
+// Show tip when entering browser fullscreen
+const handleBrowserFullscreenEnter = () => {
+  showFullscreenTip.value = true;
+  // Auto hide after 3 seconds
+  setTimeout(() => {
+    showFullscreenTip.value = false;
+  }, 3000);
+};
+
 // Use composables
 const {
   focus: editorFocus,
@@ -44,7 +66,10 @@ const {
   getHeadings,
   scrollToLine,
 } = useEditor(editorContainer, props, emit);
-const { toggleFullscreen, exitFullscreen } = useFullscreen(editorContainer);
+const { toggleFullscreen, exitFullscreen } = useFullscreen(
+  editorContainer,
+  handleBrowserFullscreenEnter,
+);
 
 // Expose methods
 defineExpose<EditorExposed>({
@@ -60,7 +85,14 @@ defineExpose<EditorExposed>({
 </script>
 
 <template>
-  <div ref="editorContainer" class="una-editor" v-bind="attrs"></div>
+  <div ref="editorContainer" class="una-editor" v-bind="attrs">
+    <!-- Fullscreen tip -->
+    <Transition name="fade">
+      <div v-if="showFullscreenTip" class="una-editor-fullscreen-tip">
+        {{ localeMessages.browserFullscreenTip }}
+      </div>
+    </Transition>
+  </div>
 </template>
 
 <style scoped>
@@ -68,6 +100,7 @@ defineExpose<EditorExposed>({
   width: 100%;
   height: 100%;
   min-height: 200px;
+  position: relative;
 }
 
 /* Browser fullscreen mode - fills viewport */
@@ -76,5 +109,32 @@ defineExpose<EditorExposed>({
   inset: 0;
   z-index: 9999;
   background: white;
+}
+
+/* Fullscreen tip */
+.una-editor-fullscreen-tip {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  z-index: 10000;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Fade transition */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>
