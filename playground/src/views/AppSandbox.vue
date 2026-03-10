@@ -10,6 +10,7 @@ const content = ref(
 
 // Editor options
 const lineNumbers = ref(true);
+const lineWrap = ref(true);
 const hybridMarkdown = ref(true);
 const vimMode = ref(false);
 const locale = ref<'zh-CN' | 'en-US'>('zh-CN');
@@ -95,6 +96,13 @@ const testScrollToLine = () => {
 
       <div class="control-group">
         <label>
+          <input v-model="lineWrap" type="checkbox" />
+          自动折行
+        </label>
+      </div>
+
+      <div class="control-group">
+        <label>
           <input v-model="hybridMarkdown" type="checkbox" />
           Hybrid 渲染
         </label>
@@ -142,6 +150,7 @@ const testScrollToLine = () => {
         ref="editorRef"
         v-model="content"
         :line-numbers="lineNumbers"
+        :line-wrap="lineWrap"
         :hybrid-markdown="hybridMarkdown"
         :vim-mode="vimMode"
         :locale="locale"

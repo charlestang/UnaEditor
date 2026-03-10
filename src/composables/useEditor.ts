@@ -64,6 +64,7 @@ export function useEditor(
   const lineNumbersCompartment = new Compartment();
   const placeholderCompartment = new Compartment();
   const readOnlyCompartment = new Compartment();
+  const lineWrapCompartment = new Compartment();
 
   // Extract image files from DataTransfer
   function extractImageFiles(dataTransfer: DataTransfer): File[] {
@@ -116,6 +117,9 @@ export function useEditor(
 
       // Line numbers (dynamic)
       lineNumbersCompartment.of(props.lineNumbers !== false ? lineNumbers() : []),
+
+      // Line wrapping (dynamic)
+      lineWrapCompartment.of(props.lineWrap !== false ? EditorView.lineWrapping : []),
 
       // Placeholder (dynamic)
       placeholderCompartment.of(props.placeholder ? placeholderExt(props.placeholder) : []),
@@ -236,6 +240,17 @@ export function useEditor(
     },
   );
 
+  // Watch lineWrap prop and update dynamically
+  watch(
+    () => props.lineWrap,
+    (shouldWrap) => {
+      if (!editorView.value) return;
+      editorView.value.dispatch({
+        effects: lineWrapCompartment.reconfigure(shouldWrap !== false ? EditorView.lineWrapping : []),
+      });
+    },
+  );
+
   // Watch placeholder prop and update dynamically
   watch(
     () => props.placeholder,
@@ -287,7 +302,7 @@ export function useEditor(
     if (!editorView.value) return;
     const view = editorView.value;
     const selection = view.state.selection.main;
-    
+
     isInternalUpdate = true;
     view.dispatch({
       changes: {
@@ -316,7 +331,7 @@ export function useEditor(
           const rawText = state.doc.sliceString(node.from, node.to);
           const text = rawText.replace(/^#+\s*/, '').trim();
           const line = state.doc.lineAt(node.from).number;
-          
+
           headings.push({ text, level, line });
         }
       },
@@ -328,10 +343,10 @@ export function useEditor(
   const scrollToLine = (lineNumber: number) => {
     if (!editorView.value) return;
     const doc = editorView.value.state.doc;
-    
+
     if (lineNumber < 1) lineNumber = 1;
     if (lineNumber > doc.lines) lineNumber = doc.lines;
-    
+
     const line = doc.line(lineNumber);
     editorView.value.dispatch({
       effects: EditorView.scrollIntoView(line.from, { y: 'start', yMargin: 20 })

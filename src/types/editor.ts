@@ -5,6 +5,7 @@ export interface EditorProps {
   modelValue: string;
   language?: string;
   lineNumbers?: boolean;
+  lineWrap?: boolean;
   hybridMarkdown?: boolean;
   vimMode?: boolean;
   locale?: string | CustomLocale;

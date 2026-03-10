@@ -13,6 +13,7 @@ const props = withDefaults(defineProps<EditorProps>(), {
   modelValue: '',
   language: 'markdown',
   lineNumbers: true,
+  lineWrap: true,
   hybridMarkdown: false,
   vimMode: false,
   locale: 'zh-CN',
