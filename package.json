@@ -1,6 +1,6 @@
 {
   "name": "una-editor",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Lightweight & high-performance Vue 3 editor powered by CodeMirror 6. Supports Hybrid Markdown and Vim mode.",
   "type": "module",
   "main": "./dist/index.cjs",
