@@ -404,14 +404,38 @@ describe('UnaEditor', () => {
     });
 
     const view = await getEditorView(wrapper);
-    
+
     // Select 'old '
     view.dispatch({ selection: { anchor: 6, head: 10 } });
-    
+
     wrapper.vm.insertText!('new ');
-    
+
     expect(view.state.doc.toString()).toBe('hello new world');
     expect(view.state.selection.main.anchor).toBe(10); // 6 + 4
+  });
+
+  it('updates modelValue when insertText is called', async () => {
+    const onUpdateModelValue = vi.fn();
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: 'hello ',
+        'onUpdate:modelValue': onUpdateModelValue,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+
+    // Set cursor to the end
+    view.dispatch({ selection: { anchor: 6 } });
+
+    wrapper.vm.insertText!('world');
+
+    // Wait for the update event to be emitted
+    await nextTick();
+
+    // Verify that modelValue update event was emitted with the new content
+    expect(onUpdateModelValue).toHaveBeenCalledWith('hello world');
+    expect(onUpdateModelValue).toHaveBeenCalledTimes(1);
   });
 
   it('extracts headings to build an outline', async () => {

@@ -303,7 +303,8 @@ export function useEditor(
     const view = editorView.value;
     const selection = view.state.selection.main;
 
-    isInternalUpdate = true;
+    // Don't set isInternalUpdate here - insertText is a public API
+    // and should trigger modelValue updates
     view.dispatch({
       changes: {
         from: selection.from,
@@ -313,7 +314,6 @@ export function useEditor(
       selection: { anchor: selection.from + text.length },
       scrollIntoView: true,
     });
-    isInternalUpdate = false;
   };
 
   const getHeadings = (): Heading[] => {
