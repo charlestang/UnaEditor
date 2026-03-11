@@ -5,7 +5,7 @@ import { defaultKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { syntaxTree } from '@codemirror/language';
 import { oneDark } from '@codemirror/theme-one-dark';
-import { vim } from '@replit/codemirror-vim';
+import { vim, Vim } from '@replit/codemirror-vim';
 import { createHybridMarkdownExtensions } from '../extensions/hybridMarkdown';
 import type { EditorProps, Heading } from '../types/editor';
 
@@ -174,6 +174,13 @@ export function useEditor(
       }),
       parent: container.value,
     });
+
+    // Configure Vim :w command if Vim mode is enabled
+    if (props.vimMode) {
+      Vim.defineEx('write', 'w', () => {
+        emit('save');
+      });
+    }
   });
 
   // Watch modelValue prop and update EditorView
@@ -226,6 +233,13 @@ export function useEditor(
       editorView.value.dispatch({
         effects: vimCompartment.reconfigure(enabled ? vim({ status: false }) : []),
       });
+
+      // Configure Vim :w command when enabling Vim mode
+      if (enabled) {
+        Vim.defineEx('write', 'w', () => {
+          emit('save');
+        });
+      }
     },
   );
 
