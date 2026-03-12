@@ -1,5 +1,5 @@
 // Main entry point for una-editor package
-export const version = '0.1.0';
+export const version = __UNA_EDITOR_VERSION__;
 
 // Export UnaEditor component
 export { default as UnaEditor } from './components/UnaEditor.vue';
