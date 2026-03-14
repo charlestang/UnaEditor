@@ -13,10 +13,9 @@ defineOptions({
 // Define props
 const props = withDefaults(defineProps<EditorProps>(), {
   modelValue: '',
-  language: 'markdown',
   lineNumbers: true,
   lineWrap: true,
-  hybridMarkdown: false,
+  livePreview: false,
   vimMode: false,
   locale: 'zh-CN',
   theme: 'light',

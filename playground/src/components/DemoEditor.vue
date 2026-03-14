@@ -5,7 +5,7 @@ import { UnaEditor } from 'una-editor';
 
 const { t } = useI18n();
 
-const hybridMarkdown = ref(true);
+const livePreview = ref(true);
 const vimMode = ref(false);
 
 const demoContent = ref(`
@@ -39,8 +39,8 @@ const content = ref('Hello World');
         <h2 class="demo-title">{{ t('demo.title') }}</h2>
         <div class="demo-controls">
           <label class="control-label">
-            <input v-model="hybridMarkdown" type="checkbox" />
-            <span class="control-text">Hybrid Markdown</span>
+            <input v-model="livePreview" type="checkbox" />
+            <span class="control-text">Live Preview</span>
           </label>
           <label class="control-label">
             <input v-model="vimMode" type="checkbox" />
@@ -51,7 +51,7 @@ const content = ref('Hello World');
       <div class="editor-wrapper">
         <UnaEditor
           v-model="demoContent"
-          :hybrid-markdown="hybridMarkdown"
+          :live-preview="livePreview"
           :vim-mode="vimMode"
           theme="dark"
         />

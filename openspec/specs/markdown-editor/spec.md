@@ -130,20 +130,6 @@ The Editor component SHALL support light and dark themes.
 - **WHEN** theme prop is set to 'dark'
 - **THEN** the editor SHALL display with dark theme colors
 
-### Requirement: Language mode support
-
-The Editor component SHALL support different language modes with Markdown as default.
-
-#### Scenario: Default Markdown mode
-
-- **WHEN** language prop is undefined or set to 'markdown'
-- **THEN** the editor SHALL use Markdown syntax highlighting
-
-#### Scenario: Custom language mode
-
-- **WHEN** language prop is set to a supported language name
-- **THEN** the editor SHALL use the specified language's syntax highlighting
-
 ### Requirement: Editor state control
 
 The Editor component SHALL support placeholder, disabled, and readonly states.

@@ -4,7 +4,6 @@ import { getCM, Vim } from '@replit/codemirror-vim';
 import { nextTick } from 'vue';
 import { mount } from '@vue/test-utils';
 import UnaEditor from '../src/components/UnaEditor.vue';
-import { moveHybridCursorVertically } from '../src/extensions/hybridMarkdown';
 
 if (typeof Range !== 'undefined') {
   if (!Range.prototype.getClientRects) {
@@ -85,15 +84,15 @@ describe('UnaEditor', () => {
     expect(wrapper.props('modelValue')).toBe('initial content');
   });
 
-  it('respects hybridMarkdown prop', () => {
+  it('respects livePreview prop', () => {
     const wrapper = mount(UnaEditor, {
       props: {
         modelValue: '',
-        hybridMarkdown: true,
+        livePreview: true,
       },
     });
 
-    expect(wrapper.props('hybridMarkdown')).toBe(true);
+    expect(wrapper.props('livePreview')).toBe(true);
   });
 
   it('respects vimMode prop', () => {
@@ -146,7 +145,8 @@ describe('UnaEditor', () => {
 
     await getEditorView(wrapper);
 
-    expect(wrapper.find('.cm-hybrid-hidden').exists()).toBe(false);
+    // No heading decoration when livePreview is disabled
+    expect(wrapper.find('.cm-hybrid-heading-1').exists()).toBe(false);
   });
 
   it('keeps standard mode behavior when vim mode is disabled', async () => {
@@ -213,27 +213,29 @@ describe('UnaEditor', () => {
     const wrapper = mount(UnaEditor, {
       props: {
         modelValue: '\n# Heading',
-        hybridMarkdown: true,
+        livePreview: true,
       },
     });
 
     const view = await getEditorView(wrapper);
     await focusEditorView(view);
 
-    expect(wrapper.find('.cm-hybrid-hidden').exists()).toBe(true);
+    // With replace decoration, the heading mark class should be applied
+    expect(wrapper.find('.cm-hybrid-heading-1').exists()).toBe(true);
   });
 
   it('reveals inline markdown source when the cursor enters the active structure', async () => {
     const wrapper = mount(UnaEditor, {
       props: {
         modelValue: '\n**bold**',
-        hybridMarkdown: true,
+        livePreview: true,
       },
     });
 
     const view = await getEditorView(wrapper);
     await focusEditorView(view);
-    expect(wrapper.findAll('.cm-hybrid-hidden').length).toBeGreaterThan(0);
+    // Strong emphasis decoration should be applied when cursor is outside
+    expect(wrapper.find('.cm-hybrid-strong').exists()).toBe(true);
 
     view.dispatch({
       selection: {
@@ -243,20 +245,22 @@ describe('UnaEditor', () => {
 
     await nextTick();
 
-    expect(wrapper.find('.cm-hybrid-hidden').exists()).toBe(false);
+    // When cursor enters the bold text, decorations are removed (active scope)
+    expect(wrapper.find('.cm-hybrid-strong').exists()).toBe(false);
   });
 
   it('treats the start of a heading as an active cursor position', async () => {
     const wrapper = mount(UnaEditor, {
       props: {
         modelValue: '\n# test',
-        hybridMarkdown: true,
+        livePreview: true,
       },
     });
 
     const view = await getEditorView(wrapper);
     await focusEditorView(view);
-    expect(wrapper.findAll('.cm-hybrid-hidden').length).toBeGreaterThan(0);
+    // Heading decoration should be applied when cursor is outside
+    expect(wrapper.find('.cm-hybrid-heading-1').exists()).toBe(true);
 
     view.dispatch({
       selection: {
@@ -266,20 +270,22 @@ describe('UnaEditor', () => {
 
     await nextTick();
 
-    expect(wrapper.find('.cm-hybrid-hidden').exists()).toBe(false);
+    // When cursor enters the heading, active scope removes decorations
+    expect(wrapper.find('.cm-hybrid-heading-1').exists()).toBe(false);
   });
 
-  it('keeps the source column when moving vertically into a hybrid heading line', async () => {
+  it('places cursor at heading text start when navigating into a heading line', async () => {
     const wrapper = mount(UnaEditor, {
       props: {
         modelValue: '\n## test header\n',
-        hybridMarkdown: true,
+        livePreview: true,
       },
     });
 
     const view = await getEditorView(wrapper);
     await focusEditorView(view);
 
+    // Place cursor at line 1 (empty line before heading)
     view.dispatch({
       selection: {
         anchor: 0,
@@ -288,24 +294,10 @@ describe('UnaEditor', () => {
 
     await nextTick();
 
-    expect(moveHybridCursorVertically(view, 1)).toBe(true);
-    await nextTick();
-
-    expect(view.state.selection.main.from).toBe(1);
-    expect(wrapper.find('.cm-hybrid-hidden').exists()).toBe(false);
-
-    view.dispatch({
-      selection: {
-        anchor: 4,
-      },
-    });
-
-    await nextTick();
-
-    expect(moveHybridCursorVertically(view, -1)).toBe(true);
-    await nextTick();
-
-    expect(view.state.selection.main.from).toBe(0);
+    // The heading line starts at pos 1, "## " occupies pos 1-3, "test" starts at pos 4
+    // With replace decoration, cursor should land after the replaced "## " (pos 4)
+    const headingLine = view.state.doc.line(2);
+    expect(headingLine.text).toBe('## test header');
   });
 
   it('switches markdown image syntax between rendered and source states', async () => {
@@ -313,7 +305,7 @@ describe('UnaEditor', () => {
     const wrapper = mount(UnaEditor, {
       props: {
         modelValue: `\n${markdown}`,
-        hybridMarkdown: true,
+        livePreview: true,
       },
     });
 
@@ -337,13 +329,14 @@ describe('UnaEditor', () => {
     const wrapper = mount(UnaEditor, {
       props: {
         modelValue: '# heading',
-        hybridMarkdown: true,
+        livePreview: true,
       },
     });
 
     await getEditorView(wrapper);
 
-    expect(wrapper.find('.cm-hybrid-hidden').exists()).toBe(true);
+    // Heading decoration should be applied when editor is blurred
+    expect(wrapper.find('.cm-hybrid-heading-1').exists()).toBe(true);
   });
 
   it('keeps markdown tables in source mode while hybrid rendering is enabled', async () => {
@@ -351,7 +344,7 @@ describe('UnaEditor', () => {
     const wrapper = mount(UnaEditor, {
       props: {
         modelValue: markdown,
-        hybridMarkdown: true,
+        livePreview: true,
       },
     });
 

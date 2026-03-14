@@ -6,7 +6,7 @@ import { Vim } from '@replit/codemirror-vim';
 
 let vimHybridNavInitialized = false;
 
-function setupVimLogicalNavigation() {
+export function setupVimLogicalNavigation() {
   if (vimHybridNavInitialized) return;
   vimHybridNavInitialized = true;
 
@@ -42,7 +42,7 @@ function setupVimLogicalNavigation() {
       return cm.posFromIndex(targetPosition);
     });
 
-    // Map the standard vertical movements to our logical motion
+    // Map j/k and arrow keys to logical line motion (Vim convention)
     Vim.mapCommand('j', 'motion', 'hybridMoveByLines', { forward: true, linewise: true }, {});
     Vim.mapCommand('k', 'motion', 'hybridMoveByLines', { forward: false, linewise: true }, {});
     Vim.mapCommand('<Down>', 'motion', 'hybridMoveByLines', { forward: true, linewise: true }, {});
@@ -84,9 +84,6 @@ const HYBRID_SCOPE_NODES = new Set([
 ]);
 
 const HYBRID_THEME = EditorView.theme({
-  '.cm-hybrid-hidden': {
-    display: 'none',
-  },
   '.cm-hybrid-heading-1': {
     fontSize: '1.875rem',
     fontWeight: '700',
@@ -152,7 +149,7 @@ const HYBRID_THEME = EditorView.theme({
   },
 });
 
-const hiddenDecoration = Decoration.mark({ class: 'cm-hybrid-hidden' });
+const hiddenDecoration = Decoration.replace({});
 const emphasisDecoration = Decoration.mark({ class: 'cm-hybrid-emphasis' });
 const strongDecoration = Decoration.mark({ class: 'cm-hybrid-strong' });
 const linkDecoration = Decoration.mark({ class: 'cm-hybrid-link' });
@@ -282,62 +279,6 @@ function isInActiveScope(node: { from: number; to: number }, scopes: HybridScope
   return scopes.some((scope) => node.from >= scope.from && node.to <= scope.to);
 }
 
-// Track the "goal column" for vertical navigation
-let virtualGoalColumn: number | null = null;
-
-export function moveHybridCursorVertically(view: EditorView, direction: -1 | 1): boolean {
-  const selection = view.state.selection.main;
-
-  if (!selection.empty) return false;
-
-  const currentLine = view.state.doc.lineAt(selection.from);
-  const targetLineNumber = currentLine.number + direction;
-
-  if (targetLineNumber < 1 || targetLineNumber > view.state.doc.lines) {
-    virtualGoalColumn = null; // Reset on boundary
-    return false;
-  }
-
-  const targetLine = view.state.doc.line(targetLineNumber);
-  const currentColumn = selection.from - currentLine.from;
-
-  // 1. Determine the goal column:
-  // If we already have a goal column from a previous vertical move, keep it.
-  // Otherwise, set the current column as the new goal column.
-  if (virtualGoalColumn === null) {
-    virtualGoalColumn = currentColumn;
-  }
-
-  // 2. Calculate target position using the goal column
-  const targetPosition = Math.min(targetLine.to, targetLine.from + virtualGoalColumn);
-
-  if (targetPosition === selection.from) return false;
-
-  // 3. Dispatch the change with a user event so we can detect it
-  view.dispatch({
-    selection: {
-      anchor: targetPosition,
-    },
-    userEvent: 'select.hybrid-vertical',
-  });
-
-  return true;
-}
-
-// A plugin to reset the virtual goal column when the user clicks or types
-const goalColumnResetPlugin = ViewPlugin.fromClass(
-  class {
-    update(update: ViewUpdate) {
-      // If the selection changed, but NOT because of our vertical navigation
-      if (
-        update.selectionSet &&
-        !update.transactions.some((tr) => tr.isUserEvent('select.hybrid-vertical'))
-      ) {
-        virtualGoalColumn = null;
-      }
-    }
-  },
-);
 
 function getBufferedVisibleRanges(view: EditorView, buffer = 160): { from: number; to: number }[] {
   const ranges = view.visibleRanges.map((range) => ({
@@ -498,22 +439,60 @@ function buildDecorations(view: EditorView, activeScopes: HybridScope[]): Decora
   return Decoration.set(decorations, true);
 }
 
-export function createHybridMarkdownExtensions(): Extension {
-  setupVimLogicalNavigation();
+// Goal column tracker for vertical navigation in non-vim mode
+let goalColumn: number | null = null;
 
+function moveByLogicalLine(view: EditorView, direction: 1 | -1): boolean {
+  const selection = view.state.selection.main;
+  if (!selection.empty) return false;
+
+  const currentLine = view.state.doc.lineAt(selection.head);
+  const targetLineNumber = currentLine.number + direction;
+
+  if (targetLineNumber < 1 || targetLineNumber > view.state.doc.lines) {
+    goalColumn = null;
+    return false;
+  }
+
+  const targetLine = view.state.doc.line(targetLineNumber);
+  const currentCol = selection.head - currentLine.from;
+
+  if (goalColumn === null) {
+    goalColumn = currentCol;
+  }
+
+  const targetPos = Math.min(targetLine.to, targetLine.from + goalColumn);
+
+  view.dispatch({
+    selection: { anchor: targetPos },
+    userEvent: 'select.livepreview-vertical',
+  });
+
+  return true;
+}
+
+// Reset goal column on any non-vertical cursor movement
+const goalColumnResetPlugin = ViewPlugin.fromClass(
+  class {
+    update(update: ViewUpdate) {
+      if (
+        update.selectionSet &&
+        !update.transactions.some((tr) => tr.isUserEvent('select.livepreview-vertical'))
+      ) {
+        goalColumn = null;
+      }
+    }
+  },
+);
+
+export function createLivePreviewExtensions(): Extension {
   return [
     HYBRID_THEME,
     goalColumnResetPlugin,
     Prec.highest(
       keymap.of([
-        {
-          key: 'ArrowDown',
-          run: (view) => moveHybridCursorVertically(view, 1),
-        },
-        {
-          key: 'ArrowUp',
-          run: (view) => moveHybridCursorVertically(view, -1),
-        },
+        { key: 'ArrowDown', run: (view) => moveByLogicalLine(view, 1) },
+        { key: 'ArrowUp', run: (view) => moveByLogicalLine(view, -1) },
       ]),
     ),
     ViewPlugin.fromClass(HybridMarkdownPlugin, {

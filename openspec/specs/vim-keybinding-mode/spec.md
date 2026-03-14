@@ -36,30 +36,20 @@
 
 ### Requirement: Arrow key navigation remains available in Vim mode
 
-当 Vim 模式启用时，编辑器 SHALL 继续允许使用方向键导航，以便现有的光标移动预期仍可与 Vim 命令并存。在开启 hybrid 渲染模式时，方向键的垂直导航行为 SHALL 与普通模式一样，采用一致的严格逻辑导航和虚拟目标列记忆规则。
+当 Vim 模式启用时，编辑器 SHALL 继续允许使用方向键导航，以便现有的光标移动预期仍可与 Vim 命令并存。方向键的垂直导航行为 SHALL 遵循 Vim 的默认约定（按逻辑行移动）。若开启 `livePreview` 导致方向键行为偏离 Vim 默认约定，编辑器 SHALL 在 `livePreview` 扩展内修复，使其还原为 Vim 的默认导航行为。
 
 #### Scenario: Move with arrow keys in Vim mode
 
 - **WHEN** Vim 模式已启用且用户按下方向键
-- **THEN** 编辑器按照当前编辑器的导航规则移动光标
+- **THEN** 编辑器按照 Vim 的默认导航规则移动光标（逻辑行）
 - **AND** 该按键 SHALL NOT 被当作文本插入处理
 
+#### Scenario: livePreview 开启时方向键导航不受干扰
+
+- **WHEN** Vim 模式已启用且 `livePreview` 为 `true`，用户按下方向键
+- **THEN** 方向键仍按 Vim 默认约定按逻辑行移动光标，与关闭 `livePreview` 时行为一致
+
 ## ADDED Requirements
-
-### Requirement: Vim 模式垂直导航 (j/k) 与 Hybrid 严格逻辑导航对齐
-
-当 Vim 模式与 Hybrid 渲染模式同时开启时，Vim 的垂直导航指令 (`j` / `k` 以及带有次数的诸如 `5j`) SHALL 被覆盖为与 Hybrid 模式一致的基于纯源码物理行的绝对逻辑跳转，以克服大体积 Widget（如图片）和隐藏标记带来的视觉换行断层。
-
-#### Scenario: 使用 j/k 在包含图片的 Hybrid 文本中导航
-
-- **WHEN** Vim 模式和 Hybrid 模式同时启用，用户在包含图片的相邻行按下 `j` 或 `k`
-- **THEN** 光标准确按照纯文本物理行进行跨越，不会因图片的高度产生跳跃失败或列偏移错误
-- **AND** Vim 内部的原生 Goal Column (`lastHPos`) SHALL 被正确传递和用于目标位置计算
-
-#### Scenario: 垂直跳转指令携带次数前缀
-
-- **WHEN** 用户在 normal mode 输入类似 `5j` 或 `3k` 的带次数的垂直跳转指令
-- **THEN** 编辑器在物理文本行层面准确计算偏移，一次性完成对应次数的逻辑行跨越
 
 ### Requirement: Save shortcut remains available when Vim mode is active
 

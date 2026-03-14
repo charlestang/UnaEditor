@@ -3,10 +3,10 @@ import { EditorState, Compartment, Prec } from '@codemirror/state';
 import { EditorView, keymap, placeholder as placeholderExt, lineNumbers } from '@codemirror/view';
 import { defaultKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
-import { syntaxTree } from '@codemirror/language';
+import { syntaxTree, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { vim, Vim } from '@replit/codemirror-vim';
-import { createHybridMarkdownExtensions } from '../extensions/hybridMarkdown';
+import { createLivePreviewExtensions, setupVimLogicalNavigation } from '../extensions/hybridMarkdown';
 import type { EditorProps, Heading } from '../types/editor';
 
 const fillHeightLayout = EditorView.theme({
@@ -100,8 +100,9 @@ export function useEditor(
         ]),
       ),
 
-      // Markdown language support
+      // Markdown language support with syntax highlighting
       markdown(),
+      syntaxHighlighting(defaultHighlightStyle),
 
       // Optional vim mode behavior
       vimCompartment.of(props.vimMode ? vim({ status: false }) : []),
@@ -110,7 +111,7 @@ export function useEditor(
       fillHeightLayout,
 
       // Optional hybrid markdown rendering layer
-      hybridCompartment.of(props.hybridMarkdown ? createHybridMarkdownExtensions() : []),
+      hybridCompartment.of(props.livePreview ? createLivePreviewExtensions() : []),
 
       // Theme (dynamic)
       themeCompartment.of(props.theme === 'dark' ? oneDark : []),
@@ -175,11 +176,13 @@ export function useEditor(
       parent: container.value,
     });
 
-    // Configure Vim :w command if Vim mode is enabled
+    // Configure Vim mode behavior
     if (props.vimMode) {
       Vim.defineEx('write', 'w', () => {
         emit('save');
       });
+      // Fix arrow keys and j/k to follow logical line navigation (Vim convention)
+      setupVimLogicalNavigation();
     }
   });
 
@@ -216,11 +219,11 @@ export function useEditor(
 
   // Watch hybridMarkdown prop and update dynamically
   watch(
-    () => props.hybridMarkdown,
+    () => props.livePreview,
     (enabled) => {
       if (!editorView.value) return;
       editorView.value.dispatch({
-        effects: hybridCompartment.reconfigure(enabled ? createHybridMarkdownExtensions() : []),
+        effects: hybridCompartment.reconfigure(enabled ? createLivePreviewExtensions() : []),
       });
     },
   );

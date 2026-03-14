@@ -3,10 +3,9 @@ import type { EditorView } from '@codemirror/view';
 // Editor component props
 export interface EditorProps {
   modelValue: string;
-  language?: string;
   lineNumbers?: boolean;
   lineWrap?: boolean;
-  hybridMarkdown?: boolean;
+  livePreview?: boolean;
   vimMode?: boolean;
   locale?: string | CustomLocale;
   placeholder?: string;
