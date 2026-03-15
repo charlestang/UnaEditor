@@ -38,8 +38,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@typescript-eslint/eslint-plugin": "^8.56.1",
-    "@typescript-eslint/parser": "^8.56.1",
+    "@typescript-eslint/eslint-plugin": "^8.57.0",
+    "@typescript-eslint/parser": "^8.57.0",
     "@vitejs/plugin-vue": "^5.2.4",
     "@vue/test-utils": "^2.4.6",
     "concurrently": "^9.2.1",
@@ -48,10 +48,10 @@
     "jsdom": "^28.1.0",
     "prettier": "^3.8.1",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.56.1",
+    "typescript-eslint": "^8.57.0",
     "vite": "^7.3.1",
-    "vitest": "^4.0.18",
-    "vue": "^3.5.29",
+    "vitest": "^4.1.0",
+    "vue": "^3.5.30",
     "vue-tsc": "^3.2.5"
   },
   "keywords": [
@@ -73,13 +73,13 @@
   },
   "homepage": "https://charlestang.github.io/UnaEditor/",
   "dependencies": {
-    "@codemirror/commands": "^6.10.2",
+    "@codemirror/commands": "^6.10.3",
     "@codemirror/lang-markdown": "^6.5.0",
     "@codemirror/language": "^6.12.2",
     "@codemirror/search": "^6.6.0",
-    "@codemirror/state": "^6.5.4",
+    "@codemirror/state": "^6.6.0",
     "@codemirror/theme-one-dark": "^6.1.3",
-    "@codemirror/view": "^6.39.16",
+    "@codemirror/view": "^6.40.0",
     "@replit/codemirror-vim": "^6.3.0"
   }
 }
