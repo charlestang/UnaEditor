@@ -15,6 +15,9 @@ const livePreview = ref(true);
 const vimMode = ref(false);
 const locale = ref<'zh-CN' | 'en-US'>('zh-CN');
 const theme = ref<'light' | 'dark'>('light');
+const fontSize = ref<number | undefined>(undefined);
+const fontFamily = ref<string | undefined>(undefined);
+const codeFontFamily = ref<string | undefined>(undefined);
 
 // Editor ref
 const editorRef = ref<EditorExposed>();
@@ -130,6 +133,38 @@ const testScrollToLine = () => {
           <option value="dark">暗色</option>
         </select>
       </div>
+
+      <div class="control-group">
+        <label>字号：</label>
+        <select v-model="fontSize">
+          <option :value="undefined">默认 (14px)</option>
+          <option :value="12">12px</option>
+          <option :value="14">14px</option>
+          <option :value="16">16px</option>
+          <option :value="18">18px</option>
+          <option :value="20">20px</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label>正文字体：</label>
+        <select v-model="fontFamily">
+          <option :value="undefined">默认</option>
+          <option value="Georgia, serif">Georgia（衬线）</option>
+          <option value="'Helvetica Neue', Arial, sans-serif">Helvetica Neue</option>
+          <option value="'Times New Roman', serif">Times New Roman</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label>代码字体：</label>
+        <select v-model="codeFontFamily">
+          <option :value="undefined">默认</option>
+          <option value="Fira Code, monospace">Fira Code</option>
+          <option value="JetBrains Mono, monospace">JetBrains Mono</option>
+          <option value="Courier New, monospace">Courier New</option>
+        </select>
+      </div>
     </div>
 
     <div class="controls">
@@ -155,6 +190,9 @@ const testScrollToLine = () => {
         :vim-mode="vimMode"
         :locale="locale"
         :theme="theme"
+        :font-size="fontSize"
+        :font-family="fontFamily"
+        :code-font-family="codeFontFamily"
         placeholder="请输入 Markdown 内容..."
         @change="handleChange"
         @save="handleSave"

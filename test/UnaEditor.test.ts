@@ -461,10 +461,140 @@ describe('UnaEditor', () => {
 
     const internalView = await getEditorView(wrapper);
     const exposedView = wrapper.vm.getEditorView!();
-    
+
     expect(exposedView).toBeDefined();
     // Verify it's the same actual editor state/doc
     expect(exposedView?.state.doc.toString()).toBe(internalView.state.doc.toString());
     expect(exposedView?.dom).toBe(internalView.dom);
+  });
+
+  it('applies fontFamily prop as CSS variable on the container', () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '',
+        fontFamily: 'Georgia, serif',
+      },
+    });
+
+    const style = wrapper.attributes('style') ?? '';
+    expect(style).toContain('--una-font-family: Georgia, serif');
+  });
+
+  it('applies codeFontFamily prop as CSS variable on the container', () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '',
+        codeFontFamily: 'Fira Code, monospace',
+      },
+    });
+
+    const style = wrapper.attributes('style') ?? '';
+    expect(style).toContain('--una-code-font-family: Fira Code, monospace');
+  });
+
+  it('applies fontSize prop as CSS variable on the container', () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '',
+        fontSize: 18,
+      },
+    });
+
+    const style = wrapper.attributes('style') ?? '';
+    expect(style).toContain('--una-font-size: 18px');
+  });
+
+  it('does not set font CSS variables when font props are not provided', () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '',
+      },
+    });
+
+    const style = wrapper.attributes('style') ?? '';
+    expect(style).not.toContain('--una-font-family');
+    expect(style).not.toContain('--una-code-font-family');
+    expect(style).not.toContain('--una-font-size');
+  });
+
+  it('updates font CSS variable when fontSize prop changes at runtime', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '',
+        fontSize: 14,
+      },
+    });
+
+    expect(wrapper.attributes('style')).toContain('--una-font-size: 14px');
+
+    await wrapper.setProps({ fontSize: 20 });
+
+    expect(wrapper.attributes('style')).toContain('--una-font-size: 20px');
+  });
+
+  it('applies cm-una-code-font decoration to inline code in non-livePreview mode', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: 'Hello `world` text',
+        livePreview: false,
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    expect(wrapper.find('.cm-una-code-font').exists()).toBe(true);
+  });
+
+  it('applies cm-una-code-font decoration to fenced code block in non-livePreview mode', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '```\nconst x = 1;\n```',
+        livePreview: false,
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    expect(wrapper.find('.cm-una-code-font').exists()).toBe(true);
+  });
+
+  it('adds code decoration when switching from livePreview to non-livePreview', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: 'Hello `world` text',
+        livePreview: true,
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    await wrapper.setProps({ livePreview: false });
+    await nextTick();
+
+    expect(wrapper.find('.cm-una-code-font').exists()).toBe(true);
+  });
+
+  it('removes standalone code decoration when switching from non-livePreview to livePreview', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '# Heading',
+        livePreview: false,
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    // No heading decoration in non-livePreview
+    expect(wrapper.find('.cm-hybrid-heading-1').exists()).toBe(false);
+
+    await wrapper.setProps({ livePreview: true });
+    await nextTick();
+
+    // Heading decoration appears after switching to livePreview
+    expect(wrapper.find('.cm-hybrid-heading-1').exists()).toBe(true);
   });
 });

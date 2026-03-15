@@ -6,7 +6,12 @@ import { markdown } from '@codemirror/lang-markdown';
 import { syntaxTree, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { vim, Vim } from '@replit/codemirror-vim';
-import { createLivePreviewExtensions, setupVimLogicalNavigation } from '../extensions/hybridMarkdown';
+import {
+  createLivePreviewExtensions,
+  createCodeDecorationExtension,
+  setupVimLogicalNavigation,
+  remeasureEffect,
+} from '../extensions/hybridMarkdown';
 import type { EditorProps, Heading } from '../types/editor';
 
 const fillHeightLayout = EditorView.theme({
@@ -42,6 +47,16 @@ const fillHeightLayout = EditorView.theme({
   },
 });
 
+const fontTheme = EditorView.theme({
+  '&': {
+    fontFamily: 'var(--una-font-family, sans-serif)',
+    fontSize: 'var(--una-font-size, 14px)',
+  },
+  '& .cm-scroller': {
+    fontFamily: 'inherit',
+  },
+});
+
 export function useEditor(
   container: Ref<HTMLElement | undefined>,
   props: EditorProps,
@@ -60,6 +75,7 @@ export function useEditor(
   // Compartments for dynamic reconfiguration
   const themeCompartment = new Compartment();
   const hybridCompartment = new Compartment();
+  const codeDecorationCompartment = new Compartment();
   const vimCompartment = new Compartment();
   const lineNumbersCompartment = new Compartment();
   const placeholderCompartment = new Compartment();
@@ -110,8 +126,14 @@ export function useEditor(
       // Keep the inner editor layout aligned with the container height
       fillHeightLayout,
 
+      // Font theme
+      fontTheme,
+
       // Optional hybrid markdown rendering layer
       hybridCompartment.of(props.livePreview ? createLivePreviewExtensions() : []),
+
+      // Code font decoration for non-livePreview mode (dynamic)
+      codeDecorationCompartment.of(props.livePreview ? [] : createCodeDecorationExtension()),
 
       // Theme (dynamic)
       themeCompartment.of(props.theme === 'dark' ? oneDark : []),
@@ -223,7 +245,10 @@ export function useEditor(
     (enabled) => {
       if (!editorView.value) return;
       editorView.value.dispatch({
-        effects: hybridCompartment.reconfigure(enabled ? createLivePreviewExtensions() : []),
+        effects: [
+          hybridCompartment.reconfigure(enabled ? createLivePreviewExtensions() : []),
+          codeDecorationCompartment.reconfigure(enabled ? [] : createCodeDecorationExtension()),
+        ],
       });
     },
   );
@@ -292,6 +317,25 @@ export function useEditor(
         ),
       });
     },
+  );
+
+  // Watch font props and trigger remeasure after DOM style update
+  watch(
+    () => [props.fontFamily, props.codeFontFamily, props.fontSize] as const,
+    ([fontFamily, codeFontFamily], [prevFontFamily, prevCodFontFamily]) => {
+      if (!editorView.value) return;
+      // Dispatch a transaction with remeasureEffect so CM updates geometry
+      // and hybrid decorations rebuild within the same update cycle.
+      editorView.value.dispatch({ effects: remeasureEffect.of(null) });
+
+      // If font family changed, wait for fonts to load and remeasure again
+      if (fontFamily !== prevFontFamily || codeFontFamily !== prevCodFontFamily) {
+        document.fonts.ready.then(() => {
+          editorView.value?.dispatch({ effects: remeasureEffect.of(null) });
+        });
+      }
+    },
+    { flush: 'post' },
   );
 
   // Cleanup EditorView

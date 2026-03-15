@@ -47,6 +47,21 @@ const localeMessages = computed(() => {
   return props.locale || zhCN;
 });
 
+// Computed style for font settings
+const containerStyle = computed(() => {
+  const style: Record<string, string> = {};
+  if (props.fontFamily) {
+    style['--una-font-family'] = props.fontFamily;
+  }
+  if (props.codeFontFamily) {
+    style['--una-code-font-family'] = props.codeFontFamily;
+  }
+  if (props.fontSize !== undefined) {
+    style['--una-font-size'] = `${props.fontSize}px`;
+  }
+  return style;
+});
+
 // Show tip when entering browser fullscreen
 const handleBrowserFullscreenEnter = () => {
   showFullscreenTip.value = true;
@@ -84,7 +99,7 @@ defineExpose<EditorExposed>({
 </script>
 
 <template>
-  <div ref="editorContainer" class="una-editor" v-bind="attrs">
+  <div ref="editorContainer" class="una-editor" :style="containerStyle" v-bind="attrs">
     <!-- Fullscreen tip -->
     <Transition name="fade">
       <div v-if="showFullscreenTip" class="una-editor-fullscreen-tip">

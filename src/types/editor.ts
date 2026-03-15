@@ -12,6 +12,9 @@ export interface EditorProps {
   disabled?: boolean;
   readonly?: boolean;
   theme?: 'light' | 'dark';
+  fontFamily?: string;
+  codeFontFamily?: string;
+  fontSize?: number;
 }
 
 // Editor component events

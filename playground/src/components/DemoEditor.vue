@@ -7,6 +7,32 @@ const { t } = useI18n();
 
 const livePreview = ref(true);
 const vimMode = ref(false);
+const fontSize = ref<number | undefined>(undefined);
+const fontFamily = ref<string | undefined>(undefined);
+const codeFontFamily = ref<string | undefined>(undefined);
+
+const fontSizeOptions = [
+  { label: 'Default', value: undefined },
+  { label: '12px', value: 12 },
+  { label: '14px', value: 14 },
+  { label: '16px', value: 16 },
+  { label: '18px', value: 18 },
+  { label: '20px', value: 20 },
+] as const;
+
+const fontFamilyOptions = [
+  { label: 'Default', value: undefined },
+  { label: 'Georgia', value: 'Georgia, serif' },
+  { label: 'Helvetica Neue', value: "'Helvetica Neue', Arial, sans-serif" },
+  { label: 'Times New Roman', value: "'Times New Roman', serif" },
+] as const;
+
+const codeFontFamilyOptions = [
+  { label: 'Default', value: undefined },
+  { label: 'Fira Code', value: 'Fira Code, monospace' },
+  { label: 'JetBrains Mono', value: 'JetBrains Mono, monospace' },
+  { label: 'Courier New', value: 'Courier New, monospace' },
+] as const;
 
 const demoContent = ref(`
 # Welcome to Una Editor 👋
@@ -46,6 +72,45 @@ const content = ref('Hello World');
             <input v-model="vimMode" type="checkbox" />
             <span class="control-text">Vim Mode</span>
           </label>
+          <label class="control-label">
+            <span class="control-text">Font Size</span>
+            <select
+              v-model="fontSize"
+              class="control-select"
+            >
+              <option
+                v-for="opt in fontSizeOptions"
+                :key="opt.label"
+                :value="opt.value"
+              >{{ opt.label }}</option>
+            </select>
+          </label>
+          <label class="control-label">
+            <span class="control-text">Font</span>
+            <select
+              v-model="fontFamily"
+              class="control-select"
+            >
+              <option
+                v-for="opt in fontFamilyOptions"
+                :key="opt.label"
+                :value="opt.value"
+              >{{ opt.label }}</option>
+            </select>
+          </label>
+          <label class="control-label">
+            <span class="control-text">Code Font</span>
+            <select
+              v-model="codeFontFamily"
+              class="control-select"
+            >
+              <option
+                v-for="opt in codeFontFamilyOptions"
+                :key="opt.label"
+                :value="opt.value"
+              >{{ opt.label }}</option>
+            </select>
+          </label>
         </div>
       </div>
       <div class="editor-wrapper">
@@ -53,6 +118,9 @@ const content = ref('Hello World');
           v-model="demoContent"
           :live-preview="livePreview"
           :vim-mode="vimMode"
+          :font-size="fontSize"
+          :font-family="fontFamily"
+          :code-font-family="codeFontFamily"
           theme="dark"
         />
       </div>
@@ -106,6 +174,16 @@ const content = ref('Hello World');
 .control-text {
   font-size: 0.875rem;
   color: #cbd5e1;
+}
+
+.control-select {
+  font-size: 0.875rem;
+  color: #cbd5e1;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.375rem;
+  cursor: pointer;
 }
 
 .editor-wrapper {

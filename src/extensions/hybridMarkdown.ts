@@ -1,8 +1,12 @@
 import { Decoration, EditorView, ViewPlugin, WidgetType, keymap } from '@codemirror/view';
 import { syntaxTree } from '@codemirror/language';
-import { Prec, type Extension } from '@codemirror/state';
+import { Prec, StateEffect, type Extension, type Range } from '@codemirror/state';
 import type { DecorationSet, ViewUpdate } from '@codemirror/view';
 import { Vim } from '@replit/codemirror-vim';
+
+// Effect dispatched after font CSS variables are updated, to signal
+// HybridMarkdownPlugin to rebuild decorations within a real transaction.
+export const remeasureEffect = StateEffect.define<null>();
 
 let vimHybridNavInitialized = false;
 
@@ -84,18 +88,22 @@ const HYBRID_SCOPE_NODES = new Set([
 ]);
 
 const HYBRID_THEME = EditorView.theme({
+  '.cm-una-code-font': {
+    fontFamily:
+      'var(--una-code-font-family, ui-monospace, SFMono-Regular, Menlo, monospace)',
+  },
   '.cm-hybrid-heading-1': {
-    fontSize: '1.875rem',
+    fontSize: '1.875em',
     fontWeight: '700',
     lineHeight: '1.25',
   },
   '.cm-hybrid-heading-2': {
-    fontSize: '1.5rem',
+    fontSize: '1.5em',
     fontWeight: '700',
     lineHeight: '1.3',
   },
   '.cm-hybrid-heading-3': {
-    fontSize: '1.25rem',
+    fontSize: '1.25em',
     fontWeight: '700',
     lineHeight: '1.35',
   },
@@ -115,7 +123,6 @@ const HYBRID_THEME = EditorView.theme({
     textUnderlineOffset: '0.18em',
   },
   '.cm-hybrid-inline-code': {
-    fontFamily: 'ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, monospace',
     backgroundColor: 'rgba(15, 23, 42, 0.08)',
     borderRadius: '4px',
     padding: '0.1em 0.3em',
@@ -128,7 +135,6 @@ const HYBRID_THEME = EditorView.theme({
   },
   '.cm-line.cm-hybrid-fenced-code-line': {
     backgroundColor: 'rgba(15, 23, 42, 0.06)',
-    fontFamily: 'ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, monospace',
   },
   '.cm-hybrid-image': {
     display: 'inline-flex',
@@ -153,7 +159,9 @@ const hiddenDecoration = Decoration.replace({});
 const emphasisDecoration = Decoration.mark({ class: 'cm-hybrid-emphasis' });
 const strongDecoration = Decoration.mark({ class: 'cm-hybrid-strong' });
 const linkDecoration = Decoration.mark({ class: 'cm-hybrid-link' });
-const inlineCodeDecoration = Decoration.mark({ class: 'cm-hybrid-inline-code' });
+const inlineCodeDecoration = Decoration.mark({
+  class: 'cm-una-code-font cm-hybrid-inline-code',
+});
 
 class ImageWidget extends WidgetType {
   constructor(
@@ -199,8 +207,15 @@ class HybridMarkdownPlugin {
   update(update: ViewUpdate): void {
     const nextScopes = getActiveScopes(update.view);
     const activeChanged = !sameScopes(this.activeScopes, nextScopes);
+    const hasRemeasure = update.transactions.some((tr) => tr.effects.some((e) => e.is(remeasureEffect)));
 
-    if (update.docChanged || update.viewportChanged || update.focusChanged || activeChanged) {
+    if (
+      update.docChanged ||
+      update.viewportChanged ||
+      update.focusChanged ||
+      activeChanged ||
+      hasRemeasure
+    ) {
       this.activeScopes = nextScopes;
       this.decorations = buildDecorations(update.view, nextScopes);
       return;
@@ -430,7 +445,13 @@ function buildDecorations(view: EditorView, activeScopes: HybridScope[]): Decora
         }
 
         if (node.name === 'FencedCode') {
-          addLineDecorations(decorations, view, node.from, node.to, 'cm-hybrid-fenced-code-line');
+          addLineDecorations(
+            decorations,
+            view,
+            node.from,
+            node.to,
+            'cm-una-code-font cm-hybrid-fenced-code-line',
+          );
         }
       },
     });
@@ -496,6 +517,57 @@ export function createLivePreviewExtensions(): Extension {
       ]),
     ),
     ViewPlugin.fromClass(HybridMarkdownPlugin, {
+      decorations: (value) => value.decorations,
+    }),
+  ];
+}
+
+// Code decoration plugin for non-livePreview mode
+const codeFontDecoration = Decoration.mark({ class: 'cm-una-code-font' });
+
+class CodeDecorationPlugin {
+  decorations: DecorationSet;
+
+  constructor(view: EditorView) {
+    this.decorations = this.buildDecorations(view);
+  }
+
+  update(update: ViewUpdate) {
+    if (update.docChanged || update.viewportChanged) {
+      this.decorations = this.buildDecorations(update.view);
+    }
+  }
+
+  buildDecorations(view: EditorView): DecorationSet {
+    const decorations: Range<Decoration>[] = [];
+    const tree = syntaxTree(view.state);
+
+    for (const { from, to } of view.visibleRanges) {
+      tree.iterate({
+        from,
+        to,
+        enter: (node) => {
+          // Add code font decoration to inline code
+          if (node.name === 'InlineCode') {
+            decorations.push(codeFontDecoration.range(node.from, node.to));
+          }
+
+          // Add code font decoration to fenced code block lines
+          if (node.name === 'FencedCode') {
+            addLineDecorations(decorations, view, node.from, node.to, 'cm-una-code-font');
+          }
+        },
+      });
+    }
+
+    return Decoration.set(decorations, true);
+  }
+}
+
+export function createCodeDecorationExtension(): Extension {
+  return [
+    HYBRID_THEME, // Include theme for cm-una-code-font class
+    ViewPlugin.fromClass(CodeDecorationPlugin, {
       decorations: (value) => value.decorations,
     }),
   ];
