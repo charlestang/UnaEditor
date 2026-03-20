@@ -69,6 +69,14 @@ interface ActiveSyntaxNode {
   parent: ActiveSyntaxNode | null;
 }
 
+interface ListItemRenderData {
+  from: number;
+  to: number;
+  kind: 'bullet' | 'ordered' | 'task';
+  label: string;
+  isChecked?: boolean;
+}
+
 const HYBRID_SCOPE_NODES = new Set([
   'ATXHeading1',
   'ATXHeading2',
@@ -132,6 +140,32 @@ const HYBRID_THEME = EditorView.theme({
     paddingLeft: '0.75rem',
     fontStyle: 'italic',
   },
+  '.cm-hybrid-list-marker': {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: '0.22em',
+    color: 'rgba(100, 116, 139, 0.9)',
+    userSelect: 'none',
+    verticalAlign: 'baseline',
+  },
+  '.cm-hybrid-list-marker-ordered': {
+    justifyContent: 'flex-end',
+    minWidth: '2ch',
+  },
+  '.cm-hybrid-list-marker-task': {
+    minWidth: '1.4em',
+  },
+  '.cm-hybrid-task-checkbox': {
+    width: '0.95em',
+    height: '0.95em',
+    margin: '0',
+    accentColor: '#14b8a6',
+    pointerEvents: 'none',
+    flex: '0 0 auto',
+    position: 'relative',
+    top: '0.08em',
+  },
   '.cm-hybrid-image': {
     display: 'inline-flex',
     alignItems: 'center',
@@ -191,6 +225,51 @@ class ImageWidget extends WidgetType {
   }
 }
 
+class ListMarkerWidget extends WidgetType {
+  constructor(private readonly data: ListItemRenderData) {
+    super();
+  }
+
+  eq(other: ListMarkerWidget): boolean {
+    return (
+      this.data.kind === other.data.kind &&
+      this.data.label === other.data.label &&
+      this.data.isChecked === other.data.isChecked
+    );
+  }
+
+  toDOM(): HTMLElement {
+    const marker = document.createElement('span');
+    marker.className = `cm-hybrid-list-marker cm-hybrid-list-marker-${this.data.kind}`;
+    marker.contentEditable = 'false';
+    marker.setAttribute('aria-hidden', 'true');
+
+    if (this.data.kind === 'task') {
+      const checkbox = document.createElement('input');
+      checkbox.className = 'cm-hybrid-task-checkbox';
+      checkbox.type = 'checkbox';
+      checkbox.checked = Boolean(this.data.isChecked);
+      checkbox.tabIndex = -1;
+      checkbox.setAttribute('aria-hidden', 'true');
+
+      marker.appendChild(checkbox);
+      return marker;
+    }
+
+    marker.textContent = this.data.label;
+
+    if (this.data.kind === 'ordered') {
+      marker.style.minWidth = `${Math.max(2, this.data.label.length)}ch`;
+    }
+
+    return marker;
+  }
+
+  ignoreEvent(): boolean {
+    return false;
+  }
+}
+
 class HybridMarkdownPlugin {
   decorations: DecorationSet;
   private activeScopes: HybridScope[];
@@ -220,6 +299,34 @@ class HybridMarkdownPlugin {
     }
 
     this.activeScopes = nextScopes;
+  }
+}
+
+function addNearestListItemScope(
+  node: ActiveSyntaxNode | null,
+  selection: { from: number; to: number },
+  scopes: HybridScope[],
+  seen: Set<string>,
+): void {
+  let current = node;
+
+  while (current) {
+    if (current.name === 'ListItem' && current.from <= selection.from && current.to >= selection.to) {
+      const key = `${current.name}:${current.from}:${current.to}`;
+
+      if (!seen.has(key)) {
+        seen.add(key);
+        scopes.push({
+          from: current.from,
+          to: current.to,
+          name: current.name,
+        });
+      }
+
+      return;
+    }
+
+    current = current.parent;
   }
 }
 
@@ -265,6 +372,8 @@ function getActiveScopes(view: EditorView): HybridScope[] {
   const anchorLeft = syntaxTree(view.state).resolveInner(selection.from, -1) as ActiveSyntaxNode;
   const anchorRight = syntaxTree(view.state).resolveInner(selection.from, 1) as ActiveSyntaxNode;
 
+  addNearestListItemScope(anchorLeft, selection, scopes, seen);
+  addNearestListItemScope(anchorRight, selection, scopes, seen);
   addScopeFromNode(anchorLeft, selection, scopes, seen);
   addScopeFromNode(anchorRight, selection, scopes, seen);
 
@@ -272,6 +381,8 @@ function getActiveScopes(view: EditorView): HybridScope[] {
     const headLeft = syntaxTree(view.state).resolveInner(selection.to, -1) as ActiveSyntaxNode;
     const headRight = syntaxTree(view.state).resolveInner(selection.to, 1) as ActiveSyntaxNode;
 
+    addNearestListItemScope(headLeft, selection, scopes, seen);
+    addNearestListItemScope(headRight, selection, scopes, seen);
     addScopeFromNode(headLeft, selection, scopes, seen);
     addScopeFromNode(headRight, selection, scopes, seen);
   }
@@ -354,8 +465,47 @@ function parseImage(nodeText: string): { alt: string; source: string } | null {
   };
 }
 
+function getListItemRenderData(view: EditorView, node: { from: number; to: number }): ListItemRenderData | null {
+  const line = view.state.doc.lineAt(node.from);
+  const lineText = view.state.doc.sliceString(node.from, line.to);
+  const markerMatch = lineText.match(/^(?<marker>(?:[-+*])|(?:\d+[.)]))(?<spacing>[ \t]+)/);
+
+  if (!markerMatch?.groups?.marker || !markerMatch.groups.spacing) return null;
+
+  const markerText = markerMatch.groups.marker;
+  const markerEnd = node.from + markerMatch[0].length;
+  const rest = lineText.slice(markerMatch[0].length);
+  const taskMatch = rest.match(/^\[(?<state>[ xX])\](?<spacing>[ \t]+|$)/);
+
+  if (taskMatch?.groups?.state) {
+    return {
+      from: node.from,
+      to: markerEnd + taskMatch[0].length,
+      kind: 'task',
+      label: taskMatch.groups.state,
+      isChecked: taskMatch.groups.state.toLowerCase() === 'x',
+    };
+  }
+
+  if (/^[-+*]$/.test(markerText)) {
+    return {
+      from: node.from,
+      to: markerEnd,
+      kind: 'bullet',
+      label: '•',
+    };
+  }
+
+  return {
+    from: node.from,
+    to: markerEnd,
+    kind: 'ordered',
+    label: markerText,
+  };
+}
+
 function buildDecorations(view: EditorView, activeScopes: HybridScope[]): DecorationSet {
-  const decorations: Array<ReturnType<typeof hiddenDecoration.range>> = [];
+  const decorations: Range<Decoration>[] = [];
 
   for (const range of getBufferedVisibleRanges(view)) {
     syntaxTree(view.state).iterate({
@@ -363,6 +513,20 @@ function buildDecorations(view: EditorView, activeScopes: HybridScope[]): Decora
       to: range.to,
       enter(node) {
         if (isInActiveScope(node, activeScopes)) return;
+
+        if (node.name === 'ListItem') {
+          const renderData = getListItemRenderData(view, node);
+
+          if (renderData) {
+            decorations.push(
+              Decoration.replace({
+                widget: new ListMarkerWidget(renderData),
+              }).range(renderData.from, renderData.to),
+            );
+          }
+
+          return;
+        }
 
         if (node.name === 'Image') {
           const parsed = parseImage(view.state.doc.sliceString(node.from, node.to));

@@ -1,37 +1,10 @@
-# Capability: project-landing-page
-
-## Purpose
-
-TBD
-
-## Requirements
-
-### Requirement: Landing Page Routing
-
-The application SHALL provide a landing page accessible at the root route (`/`).
-
-#### Scenario: User visits the root URL
-
-- **WHEN** user navigates to the root URL (`/`)
-- **THEN** the application displays the Landing Page view
-
-### Requirement: Landing Page Sections
-
-The landing page SHALL contain a Hero section, a Features grid, an Interactive Demo section, and a Footer.
-
-#### Scenario: User views the landing page
-
-- **WHEN** the user scrolls through the landing page
-- **THEN** they see the Hero section with project title and buttons
-- **THEN** they see the Features grid highlighting key capabilities
-- **THEN** they see the Interactive Demo section with the editor
-- **THEN** they see the Footer with links to GitHub and documentation
+## MODIFIED Requirements
 
 ### Requirement: Interactive Demo
 
 The landing page SHALL include an interactive demonstration of the `UnaEditor` component. This demo SHALL prioritize presentation quality and first impression, showing the editor in a well-tuned state with curated sample content that highlights rich Markdown rendering quality. The landing page demo MUST keep its controls intentionally minimal, limited to high-value appearance options such as editor theme and code theme.
 
-#### Scenario: User interacts with the demo
+#### Scenario: User interacts with the landing page demo
 
 - **WHEN** the user interacts with the editor in the Demo section
 - **THEN** the editor responds normally while presenting a curated showcase of rich Markdown rendering

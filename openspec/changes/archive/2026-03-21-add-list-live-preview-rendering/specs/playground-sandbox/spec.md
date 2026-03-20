@@ -1,19 +1,4 @@
-# Capability: playground-sandbox
-
-## Purpose
-
-TBD
-
-## Requirements
-
-### Requirement: Sandbox Routing
-
-The application SHALL provide a pure development sandbox accessible at the `/sandbox` route (or equivalent development route).
-
-#### Scenario: Developer visits the sandbox URL
-
-- **WHEN** the developer navigates to the `/sandbox` URL
-- **THEN** the application displays the Sandbox view without landing page styles interfering
+## MODIFIED Requirements
 
 ### Requirement: Sandbox Isolation
 
@@ -30,12 +15,3 @@ The sandbox view SHALL contain the original raw `UnaEditor` playground component
 - **WHEN** the sandbox view loads
 - **THEN** its sample content SHALL include a richer mix of Markdown syntax and editor features than the landing page demo
 - **AND** that content SHALL be suitable for manually validating rendering, interaction, and option combinations
-
-### Requirement: Default Local Development Routing
-
-The local development server (`pnpm dev`) SHOULD allow developers to easily access the sandbox for iteration.
-
-#### Scenario: Developer starts the dev server
-
-- **WHEN** the developer runs `pnpm dev`
-- **THEN** they can navigate to `/sandbox` to continue component development uninterrupted

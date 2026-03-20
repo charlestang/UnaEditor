@@ -1,26 +1,23 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { UnaEditor } from 'una-editor';
 
 const { t } = useI18n();
 
-const livePreview = ref(true);
-const vimMode = ref(false);
-const codeLineNumbers = ref(false);
 const editorTheme = ref<'light' | 'dark'>('dark');
 const codeTheme = ref<'auto' | string>('auto');
-const fontSize = ref<number | undefined>(undefined);
-const fontFamily = ref<string | undefined>(undefined);
-const codeFontFamily = ref<string | undefined>(undefined);
+const wrapperClass = computed(() =>
+  editorTheme.value === 'light' ? 'editor-wrapper-light' : 'editor-wrapper-dark',
+);
 
-const editorThemeOptions = [
-  { label: 'Light', value: 'light' },
-  { label: 'Dark', value: 'dark' },
-] as const;
+const editorThemeOptions = computed(() => [
+  { label: t('demo.controls.light'), value: 'light' },
+  { label: t('demo.controls.dark'), value: 'dark' },
+]);
 
-const codeThemeOptions = [
-  { label: 'Auto', value: 'auto' },
+const codeThemeOptions = computed(() => [
+  { label: t('demo.controls.auto'), value: 'auto' },
   { label: 'One Dark', value: 'one-dark' },
   { label: 'Dracula', value: 'dracula' },
   { label: 'Monokai', value: 'monokai' },
@@ -30,30 +27,7 @@ const codeThemeOptions = [
   { label: 'GitHub Light', value: 'github-light' },
   { label: 'Solarized Light', value: 'solarized-light' },
   { label: 'Atom One Light', value: 'atom-one-light' },
-] as const;
-
-const fontSizeOptions = [
-  { label: 'Default', value: undefined },
-  { label: '12px', value: 12 },
-  { label: '14px', value: 14 },
-  { label: '16px', value: 16 },
-  { label: '18px', value: 18 },
-  { label: '20px', value: 20 },
-] as const;
-
-const fontFamilyOptions = [
-  { label: 'Default', value: undefined },
-  { label: 'Georgia', value: 'Georgia, serif' },
-  { label: 'Helvetica Neue', value: "'Helvetica Neue', Arial, sans-serif" },
-  { label: 'Times New Roman', value: "'Times New Roman', serif" },
-] as const;
-
-const codeFontFamilyOptions = [
-  { label: 'Default', value: undefined },
-  { label: 'Fira Code', value: 'Fira Code, monospace' },
-  { label: 'JetBrains Mono', value: 'JetBrains Mono, monospace' },
-  { label: 'Courier New', value: 'Courier New, monospace' },
-] as const;
+]);
 
 const demoContent = ref(`
 # Welcome to Una Editor 👋
@@ -66,6 +40,16 @@ A lightweight, high-performance **Vue 3** editor component library based on Code
 - Toggle **Live Preview** above to see WYSIWYG headings and emphasis
 - Toggle **Vim Mode** to use classic modal editing (\`j\`, \`k\`, \`i\`, \`esc\`)
 - Try different **Code Themes** and enable **Line Numbers**
+
+### Rich Markdown Preview
+
+This editor renders **bold**, *italic*, and ***bold italic*** text in place while keeping Markdown source editable.
+
+- Standard bullet lists stay readable in live preview
+- [ ] Task lists render as clean checkboxes
+- [x] Checked tasks still fall back to Markdown source when you edit them
+
+> Blockquotes, links like [CodeMirror](https://codemirror.net/), and inline code such as \`const count = ref(0)\` are all part of the same editing surface.
 
 ### TypeScript Example
 
@@ -99,19 +83,7 @@ print(fibonacci(10))
         <h2 class="demo-title">{{ t('demo.title') }}</h2>
         <div class="demo-controls">
           <label class="control-label">
-            <input v-model="livePreview" type="checkbox" />
-            <span class="control-text">Live Preview</span>
-          </label>
-          <label class="control-label">
-            <input v-model="vimMode" type="checkbox" />
-            <span class="control-text">Vim Mode</span>
-          </label>
-          <label class="control-label">
-            <input v-model="codeLineNumbers" type="checkbox" />
-            <span class="control-text">Code Line Numbers</span>
-          </label>
-          <label class="control-label">
-            <span class="control-text">Editor Theme</span>
+            <span class="control-text">{{ t('demo.controls.editorTheme') }}</span>
             <select v-model="editorTheme" class="control-select">
               <option v-for="opt in editorThemeOptions" :key="opt.label" :value="opt.value">
                 {{ opt.label }}
@@ -119,50 +91,21 @@ print(fibonacci(10))
             </select>
           </label>
           <label class="control-label">
-            <span class="control-text">Code Theme</span>
+            <span class="control-text">{{ t('demo.controls.codeTheme') }}</span>
             <select v-model="codeTheme" class="control-select">
               <option v-for="opt in codeThemeOptions" :key="opt.label" :value="opt.value">
                 {{ opt.label }}
               </option>
             </select>
           </label>
-          <label class="control-label">
-            <span class="control-text">Font Size</span>
-            <select v-model="fontSize" class="control-select">
-              <option v-for="opt in fontSizeOptions" :key="opt.label" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
-          </label>
-          <label class="control-label">
-            <span class="control-text">Font</span>
-            <select v-model="fontFamily" class="control-select">
-              <option v-for="opt in fontFamilyOptions" :key="opt.label" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
-          </label>
-          <label class="control-label">
-            <span class="control-text">Code Font</span>
-            <select v-model="codeFontFamily" class="control-select">
-              <option v-for="opt in codeFontFamilyOptions" :key="opt.label" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
-          </label>
         </div>
       </div>
-      <div class="editor-wrapper">
+      <div class="editor-wrapper" :class="wrapperClass">
         <UnaEditor
           v-model="demoContent"
-          :live-preview="livePreview"
-          :vim-mode="vimMode"
-          :code-line-numbers="codeLineNumbers"
+          live-preview
           :theme="editorTheme"
           :code-theme="codeTheme"
-          :font-size="fontSize"
-          :font-family="fontFamily"
-          :code-font-family="codeFontFamily"
         />
       </div>
     </div>
@@ -228,18 +171,43 @@ print(fibonacci(10))
 }
 
 .editor-wrapper {
-  background: #282c34; /* Match One Dark theme background */
   border-radius: 0.75rem;
   overflow: hidden;
+  height: 500px;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.editor-wrapper-dark {
+  background: #282c34;
   box-shadow:
     0 20px 25px -5px rgba(0, 0, 0, 0.5),
     0 8px 10px -6px rgba(0, 0, 0, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  height: 500px;
+}
+
+.editor-wrapper-light {
+  background: #ffffff;
+  box-shadow:
+    0 20px 25px -5px rgba(15, 23, 42, 0.08),
+    0 8px 10px -6px rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.35);
 }
 
 /* Ensure UnaEditor fills the wrapper */
 .editor-wrapper :deep(.una-editor) {
   height: 100%;
+}
+
+.editor-wrapper-light :deep(.cm-editor),
+.editor-wrapper-light :deep(.cm-scroller) {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.editor-wrapper-light :deep(.cm-gutters) {
+  color: #64748b;
 }
 </style>

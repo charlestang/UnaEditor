@@ -31,7 +31,21 @@
     }
   },
   "demo": {
-    "title": "Interactive Demo"
+    "title": "Interactive Demo",
+    "controls": {
+      "livePreview": "Live Preview",
+      "vimMode": "Vim Mode",
+      "codeLineNumbers": "Code Line Numbers",
+      "editorTheme": "Editor Theme",
+      "codeTheme": "Code Theme",
+      "fontSize": "Font Size",
+      "font": "Font",
+      "codeFont": "Code Font",
+      "light": "Light",
+      "dark": "Dark",
+      "auto": "Auto",
+      "default": "Default"
+    }
   },
   "footer": {
     "resources": "Resources",

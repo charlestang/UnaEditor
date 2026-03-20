@@ -31,7 +31,21 @@
     }
   },
   "demo": {
-    "title": "交互演示"
+    "title": "交互演示",
+    "controls": {
+      "livePreview": "实时预览",
+      "vimMode": "Vim 模式",
+      "codeLineNumbers": "代码行号",
+      "editorTheme": "编辑器主题",
+      "codeTheme": "代码主题",
+      "fontSize": "字号",
+      "font": "正文字体",
+      "codeFont": "代码字体",
+      "light": "亮色",
+      "dark": "暗色",
+      "auto": "自动",
+      "default": "默认"
+    }
   },
   "footer": {
     "resources": "资源",

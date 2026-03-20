@@ -5,7 +5,7 @@ import type { EditorExposed } from 'una-editor';
 
 // Editor state
 const content = ref(
-  '# Hello UnaEditor\n\n这是一个基于 CodeMirror 6 的 Markdown 编辑器。\n\n## 功能特性\n\n- 支持 v-model 双向绑定\n- 支持行号显示\n- 支持 Hybrid Markdown 渲染\n- 支持国际化（中英文）\n- 支持亮色/暗色主题\n- 支持全屏模式\n- 支持图片拖拽和粘贴\n- 支持 Mod-s 保存快捷键\n\n> 这是一段 blockquote，用来演示首期的保守增强效果。\n\n`inline code`、**bold**、*italic* 和 [link](https://codemirror.net/) 都可以在 hybrid 模式下看到更接近渲染态的显示。\n\n![UnaEditor Demo](https://placehold.co/320x160/orange/white?text=UnaEditor)\n\n```ts\nfunction greet(name: string) {\n  return `Hello, ${name}`;\n}\n```\n\n| feature | status |\n| --- | --- |\n| tables | source mode |\n\n试试编辑这段文字，或者拖拽图片到编辑器中！',
+  '# Hello UnaEditor\n\n这是一个基于 CodeMirror 6 的 Markdown 编辑器。\n\n## 功能特性\n\n- 支持 v-model 双向绑定\n- 支持行号显示\n- 支持 Hybrid Markdown 渲染\n- 支持国际化（中英文）\n- 支持亮色/暗色主题\n- 支持全屏模式\n- 支持图片拖拽和粘贴\n- 支持 Mod-s 保存快捷键\n\n### 列表预览\n\n- 无序列表会以更接近阅读态的 bullet 显示\n* `*` 和 `+` 这类标准 marker 也支持\n+ 混合和嵌套列表可以继续编辑\n1. 有序列表支持 `.` 分隔符\n2) 也支持 `)` 分隔符\n\n- [ ] Task list 会显示为只读 checkbox\n- [x] 点击 checkbox 不会直接切换状态，仍然通过源码编辑\n\n> 这是一段 blockquote，用来演示首期的保守增强效果。\n\n`inline code`、**bold**、*italic* 和 [link](https://codemirror.net/) 都可以在 hybrid 模式下看到更接近渲染态的显示。\n\n![UnaEditor Demo](https://placehold.co/320x160/orange/white?text=UnaEditor)\n\n```ts\nfunction greet(name: string) {\n  return `Hello, ${name}`;\n}\n```\n\n| feature | status |\n| --- | --- |\n| tables | source mode |\n\n试试编辑这段文字，或者拖拽图片到编辑器中！',
 );
 
 // Editor options

@@ -288,7 +288,7 @@ describe('UnaEditor', () => {
     // Place cursor at line 1 (empty line before heading)
     view.dispatch({
       selection: {
-        anchor: 0,
+        anchor: 2,
       },
     });
 
@@ -352,6 +352,123 @@ describe('UnaEditor', () => {
 
     expect(wrapper.find('table').exists()).toBe(false);
     expect(wrapper.find('.cm-content').element.textContent).toContain('| head | value |');
+  });
+
+  it('renders standard unordered list markers in live preview', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '* item\n+ another',
+        livePreview: true,
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    const markers = wrapper.findAll('.cm-hybrid-list-marker-bullet');
+    expect(markers).toHaveLength(2);
+    expect(markers[0].text()).toBe('•');
+    expect(markers[1].text()).toBe('•');
+    expect(wrapper.find('.cm-content').element.textContent).not.toContain('* item');
+    expect(wrapper.find('.cm-content').element.textContent).not.toContain('+ another');
+  });
+
+  it('renders ordered list markers for dot and paren delimiters in live preview', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '1. first\n2) second',
+        livePreview: true,
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    const markers = wrapper.findAll('.cm-hybrid-list-marker-ordered');
+    expect(markers).toHaveLength(2);
+    expect(markers[0].text()).toBe('1.');
+    expect(markers[1].text()).toBe('2)');
+  });
+
+  it('renders GFM task list items as read-only checkboxes', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '- [ ] todo\n+ [x] done\n1) [X] ship',
+        livePreview: true,
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    const checkboxes = wrapper.findAll('.cm-hybrid-task-checkbox');
+    expect(checkboxes).toHaveLength(3);
+    expect((checkboxes[0].element as HTMLInputElement).checked).toBe(false);
+    expect((checkboxes[1].element as HTMLInputElement).checked).toBe(true);
+    expect((checkboxes[2].element as HTMLInputElement).checked).toBe(true);
+  });
+
+  it('reveals markdown list source when the cursor enters the current list item', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '\n* item',
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await focusEditorView(view);
+    await nextTick();
+
+    expect(wrapper.find('.cm-hybrid-list-marker-bullet').exists()).toBe(true);
+
+    view.dispatch({
+      selection: {
+        anchor: 3,
+      },
+    });
+
+    await nextTick();
+
+    expect(wrapper.find('.cm-hybrid-list-marker-bullet').exists()).toBe(false);
+    expect(wrapper.find('.cm-content').element.textContent).toContain('* item');
+  });
+
+  it('keeps nested and mixed list structures readable in live preview', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '- parent\n  1) child\n  + [ ] task',
+        livePreview: true,
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    expect(wrapper.findAll('.cm-hybrid-list-marker-bullet')).toHaveLength(1);
+    expect(wrapper.findAll('.cm-hybrid-list-marker-ordered')).toHaveLength(1);
+    expect(wrapper.findAll('.cm-hybrid-list-marker-task')).toHaveLength(1);
+  });
+
+  it('does not toggle task list state when clicking the rendered checkbox', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '- [ ] todo',
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    const checkbox = wrapper.find('.cm-hybrid-task-checkbox');
+    expect(checkbox.exists()).toBe(true);
+
+    await checkbox.trigger('click');
+    await nextTick();
+
+    expect(view.state.doc.toString()).toBe('- [ ] todo');
+    expect(wrapper.find('.cm-hybrid-task-checkbox').exists()).toBe(true);
   });
 
   it('exposes programmable API methods', () => {

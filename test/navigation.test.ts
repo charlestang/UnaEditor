@@ -23,6 +23,7 @@ if (typeof Range !== 'undefined') {
 // Line 2: "## heading"      (offset 11..21)  — "## " hidden by livePreview
 // Line 3: "third line"      (offset 22..32)
 const FIXTURE = 'first line\n## heading\nthird line';
+const LIST_FIXTURE = 'first line\n- bullet item\nthird line';
 
 function createVimLivePreviewEditor(doc: string) {
   setupVimLogicalNavigation();
@@ -111,6 +112,21 @@ describe('Navigation: vim + livePreview logical line movement', () => {
     const cm = getCM(view)!;
 
     Vim.handleKey(cm, '<Up>', 'test');
+
+    const pos = cursorPos(view);
+    expect(pos.line).toBe(2);
+    expect(pos.col).toBe(0);
+
+    parent.remove();
+  });
+
+  it('j still moves to a list line at the corresponding logical column', () => {
+    const { view, parent } = createVimLivePreviewEditor(LIST_FIXTURE);
+
+    setCursor(view, 0);
+    const cm = getCM(view)!;
+
+    Vim.handleKey(cm, 'j', 'test');
 
     const pos = cursorPos(view);
     expect(pos.line).toBe(2);

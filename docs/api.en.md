@@ -9,7 +9,7 @@ This document lists the properties, events, and exposed methods provided by the 
 | Property                 | Type      | Default | Description                                                                                                |
 | ------------------------ | --------- | ------- | ---------------------------------------------------------------------------------------------------------- |
 | `modelValue` / `v-model` | `string`  | `''`    | The content of the editor.                                                                                 |
-| `livePreview`            | `boolean` | `false` | Whether to enable hybrid rendering mode. Provides a WYSIWYG experience for headings, emphasis, links, etc. |
+| `livePreview`            | `boolean` | `false` | Whether to enable hybrid rendering mode. Provides a WYSIWYG experience for headings, emphasis, links, lists, task lists, and more. |
 | `vimMode`                | `boolean` | `false` | Whether to enable Vim keymap mode. Supports classic Vim modal editing (`Mod-s` is still available).        |
 | `lineNumbers`            | `boolean` | `true`  | Whether to show line numbers.                                                                              |
 | `lineWrap`               | `boolean` | `true`  | Whether to enable line wrapping.                                                                           |
