@@ -12,9 +12,11 @@
 ## Capabilities
 
 ### New Capabilities
+
 - `editor-programmable-api`: 提供如获取底层视图、操作光标插入、大纲解析和程序化滚动等高级编辑器交互接口。
 
 ### Modified Capabilities
+
 无。
 
 ## Impact

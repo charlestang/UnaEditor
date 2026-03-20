@@ -12,7 +12,11 @@ import {
   setupVimLogicalNavigation,
   remeasureEffect,
 } from '../extensions/hybridMarkdown';
-import type { EditorProps, Heading } from '../types/editor';
+import { createLanguageDescriptions } from '../extensions/languageSupport';
+import { createCodeBlockDecoratorExtension } from '../extensions/codeBlockDecorator';
+import { createCodeThemeExtension } from '../extensions/codeThemeExtension';
+import { getCodeTheme, getDefaultCodeTheme } from '../themes/codeThemes';
+import type { EditorProps, Heading, CodeTheme } from '../types/editor';
 
 const fillHeightLayout = EditorView.theme({
   '&': {
@@ -81,6 +85,26 @@ export function useEditor(
   const placeholderCompartment = new Compartment();
   const readOnlyCompartment = new Compartment();
   const lineWrapCompartment = new Compartment();
+  const codeThemeCompartment = new Compartment();
+  const codeBlockDecoratorCompartment = new Compartment();
+
+  // Helper to resolve code theme
+  function resolveCodeTheme(
+    codeTheme: 'auto' | string | undefined,
+    editorTheme: 'light' | 'dark',
+  ): CodeTheme {
+    if (!codeTheme || codeTheme === 'auto') {
+      return getDefaultCodeTheme(editorTheme);
+    }
+
+    const theme = getCodeTheme(codeTheme);
+    if (!theme) {
+      console.warn(`Unknown code theme: ${codeTheme}, falling back to default`);
+      return getDefaultCodeTheme(editorTheme);
+    }
+
+    return theme;
+  }
 
   // Extract image files from DataTransfer
   function extractImageFiles(dataTransfer: DataTransfer): File[] {
@@ -116,9 +140,11 @@ export function useEditor(
         ]),
       ),
 
-      // Markdown language support with syntax highlighting
-      markdown(),
-      syntaxHighlighting(defaultHighlightStyle),
+      // Markdown language support with syntax highlighting and nested code languages
+      markdown({
+        codeLanguages: createLanguageDescriptions(),
+      }),
+      syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
 
       // Optional vim mode behavior
       vimCompartment.of(props.vimMode ? vim({ status: false }) : []),
@@ -129,6 +155,11 @@ export function useEditor(
       // Font theme
       fontTheme,
 
+      // Code block decorator (always active, independent of hybridMarkdown)
+      codeBlockDecoratorCompartment.of(
+        createCodeBlockDecoratorExtension(props.codeLineNumbers || false),
+      ),
+
       // Optional hybrid markdown rendering layer
       hybridCompartment.of(props.livePreview ? createLivePreviewExtensions() : []),
 
@@ -137,6 +168,11 @@ export function useEditor(
 
       // Theme (dynamic)
       themeCompartment.of(props.theme === 'dark' ? oneDark : []),
+
+      // Code block theme (dynamic)
+      codeThemeCompartment.of(
+        createCodeThemeExtension(resolveCodeTheme(props.codeTheme, props.theme || 'light')),
+      ),
 
       // Line numbers (dynamic)
       lineNumbersCompartment.of(props.lineNumbers !== false ? lineNumbers() : []),
@@ -239,6 +275,31 @@ export function useEditor(
     },
   );
 
+  // Watch codeTheme and theme props for code block theme updates
+  watch(
+    () => [props.codeTheme, props.theme] as const,
+    ([codeThemeName, editorTheme]) => {
+      if (!editorView.value) return;
+      const theme = resolveCodeTheme(codeThemeName, editorTheme || 'light');
+      editorView.value.dispatch({
+        effects: codeThemeCompartment.reconfigure(createCodeThemeExtension(theme)),
+      });
+    },
+  );
+
+  // Watch codeLineNumbers prop and update dynamically
+  watch(
+    () => props.codeLineNumbers,
+    (showLineNumbers) => {
+      if (!editorView.value) return;
+      editorView.value.dispatch({
+        effects: codeBlockDecoratorCompartment.reconfigure(
+          createCodeBlockDecoratorExtension(showLineNumbers || false),
+        ),
+      });
+    },
+  );
+
   // Watch hybridMarkdown prop and update dynamically
   watch(
     () => props.livePreview,
@@ -288,7 +349,9 @@ export function useEditor(
     (shouldWrap) => {
       if (!editorView.value) return;
       editorView.value.dispatch({
-        effects: lineWrapCompartment.reconfigure(shouldWrap !== false ? EditorView.lineWrapping : []),
+        effects: lineWrapCompartment.reconfigure(
+          shouldWrap !== false ? EditorView.lineWrapping : [],
+        ),
       });
     },
   );

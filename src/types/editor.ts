@@ -1,5 +1,49 @@
 import type { EditorView } from '@codemirror/view';
 
+// Code theme names
+export type CodeThemeName =
+  // Dark themes
+  | 'one-dark'
+  | 'dracula'
+  | 'monokai'
+  | 'solarized-dark'
+  | 'nord'
+  | 'tokyo-night'
+  // Light themes
+  | 'github-light'
+  | 'solarized-light'
+  | 'atom-one-light';
+
+// Code theme color definitions
+export interface CodeThemeColors {
+  background: string;
+  foreground: string;
+  selection: string;
+  lineNumber: string;
+  keyword: string;
+  function: string;
+  string: string;
+  number: string;
+  comment: string;
+  operator: string;
+  variable: string;
+  type: string;
+  // Additional token types
+  constant?: string;
+  property?: string;
+  tag?: string;
+  attribute?: string;
+  regexp?: string;
+  escape?: string;
+}
+
+// Code theme structure
+export interface CodeTheme {
+  name: string;
+  type: 'light' | 'dark';
+  colors: CodeThemeColors;
+}
+
 // Editor component props
 export interface EditorProps {
   modelValue: string;
@@ -15,6 +59,20 @@ export interface EditorProps {
   fontFamily?: string;
   codeFontFamily?: string;
   fontSize?: number;
+
+  /**
+   * Code block theme
+   * - 'auto': Follow editor theme
+   * - CodeThemeName: Use specified color scheme
+   * @default 'auto'
+   */
+  codeTheme?: 'auto' | CodeThemeName;
+
+  /**
+   * Show line numbers in code blocks
+   * @default false
+   */
+  codeLineNumbers?: boolean;
 }
 
 // Editor component events

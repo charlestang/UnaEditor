@@ -19,6 +19,8 @@ const props = withDefaults(defineProps<EditorProps>(), {
   vimMode: false,
   locale: 'zh-CN',
   theme: 'light',
+  codeTheme: 'auto',
+  codeLineNumbers: false,
 });
 
 // Define emits

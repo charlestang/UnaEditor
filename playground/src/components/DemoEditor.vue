@@ -7,9 +7,30 @@ const { t } = useI18n();
 
 const livePreview = ref(true);
 const vimMode = ref(false);
+const codeLineNumbers = ref(false);
+const editorTheme = ref<'light' | 'dark'>('dark');
+const codeTheme = ref<'auto' | string>('auto');
 const fontSize = ref<number | undefined>(undefined);
 const fontFamily = ref<string | undefined>(undefined);
 const codeFontFamily = ref<string | undefined>(undefined);
+
+const editorThemeOptions = [
+  { label: 'Light', value: 'light' },
+  { label: 'Dark', value: 'dark' },
+] as const;
+
+const codeThemeOptions = [
+  { label: 'Auto', value: 'auto' },
+  { label: 'One Dark', value: 'one-dark' },
+  { label: 'Dracula', value: 'dracula' },
+  { label: 'Monokai', value: 'monokai' },
+  { label: 'Solarized Dark', value: 'solarized-dark' },
+  { label: 'Nord', value: 'nord' },
+  { label: 'Tokyo Night', value: 'tokyo-night' },
+  { label: 'GitHub Light', value: 'github-light' },
+  { label: 'Solarized Light', value: 'solarized-light' },
+  { label: 'Atom One Light', value: 'atom-one-light' },
+] as const;
 
 const fontSizeOptions = [
   { label: 'Default', value: undefined },
@@ -42,16 +63,29 @@ A lightweight, high-performance **Vue 3** editor component library based on Code
 ## Try it out!
 
 - Edit this text directly
-- Toggle **Hybrid Markdown** above to see WYSIWYG headings and emphasis
+- Toggle **Live Preview** above to see WYSIWYG headings and emphasis
 - Toggle **Vim Mode** to use classic modal editing (\`j\`, \`k\`, \`i\`, \`esc\`)
+- Try different **Code Themes** and enable **Line Numbers**
 
-### Code Block Example
+### TypeScript Example
 
 \`\`\`typescript
 import { ref } from 'vue';
 import { UnaEditor } from 'una-editor';
 
 const content = ref('Hello World');
+const codeTheme = ref('dracula');
+\`\`\`
+
+### Python Example
+
+\`\`\`python
+def fibonacci(n):
+    if n <= 1:
+        return n
+    return fibonacci(n-1) + fibonacci(n-2)
+
+print(fibonacci(10))
 \`\`\`
 
 > Enjoy building amazing things! 🚀
@@ -73,42 +107,47 @@ const content = ref('Hello World');
             <span class="control-text">Vim Mode</span>
           </label>
           <label class="control-label">
+            <input v-model="codeLineNumbers" type="checkbox" />
+            <span class="control-text">Code Line Numbers</span>
+          </label>
+          <label class="control-label">
+            <span class="control-text">Editor Theme</span>
+            <select v-model="editorTheme" class="control-select">
+              <option v-for="opt in editorThemeOptions" :key="opt.label" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </select>
+          </label>
+          <label class="control-label">
+            <span class="control-text">Code Theme</span>
+            <select v-model="codeTheme" class="control-select">
+              <option v-for="opt in codeThemeOptions" :key="opt.label" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </select>
+          </label>
+          <label class="control-label">
             <span class="control-text">Font Size</span>
-            <select
-              v-model="fontSize"
-              class="control-select"
-            >
-              <option
-                v-for="opt in fontSizeOptions"
-                :key="opt.label"
-                :value="opt.value"
-              >{{ opt.label }}</option>
+            <select v-model="fontSize" class="control-select">
+              <option v-for="opt in fontSizeOptions" :key="opt.label" :value="opt.value">
+                {{ opt.label }}
+              </option>
             </select>
           </label>
           <label class="control-label">
             <span class="control-text">Font</span>
-            <select
-              v-model="fontFamily"
-              class="control-select"
-            >
-              <option
-                v-for="opt in fontFamilyOptions"
-                :key="opt.label"
-                :value="opt.value"
-              >{{ opt.label }}</option>
+            <select v-model="fontFamily" class="control-select">
+              <option v-for="opt in fontFamilyOptions" :key="opt.label" :value="opt.value">
+                {{ opt.label }}
+              </option>
             </select>
           </label>
           <label class="control-label">
             <span class="control-text">Code Font</span>
-            <select
-              v-model="codeFontFamily"
-              class="control-select"
-            >
-              <option
-                v-for="opt in codeFontFamilyOptions"
-                :key="opt.label"
-                :value="opt.value"
-              >{{ opt.label }}</option>
+            <select v-model="codeFontFamily" class="control-select">
+              <option v-for="opt in codeFontFamilyOptions" :key="opt.label" :value="opt.value">
+                {{ opt.label }}
+              </option>
             </select>
           </label>
         </div>
@@ -118,10 +157,12 @@ const content = ref('Hello World');
           v-model="demoContent"
           :live-preview="livePreview"
           :vim-mode="vimMode"
+          :code-line-numbers="codeLineNumbers"
+          :theme="editorTheme"
+          :code-theme="codeTheme"
           :font-size="fontSize"
           :font-family="fontFamily"
           :code-font-family="codeFontFamily"
-          theme="dark"
         />
       </div>
     </div>

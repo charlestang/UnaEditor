@@ -23,7 +23,8 @@ const { t } = useI18n();
           <a
             href="https://github.com/charlestang/UnaEditor/blob/main/docs/api.md"
             target="_blank"
-          >{{ t('footer.apiDocs') }}</a>
+            >{{ t('footer.apiDocs') }}</a
+          >
           <a href="https://github.com/charlestang/UnaEditor/issues" target="_blank">Issues</a>
         </div>
         <div class="link-group">

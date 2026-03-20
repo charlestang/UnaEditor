@@ -378,12 +378,12 @@ describe('UnaEditor', () => {
     });
 
     const view = await getEditorView(wrapper);
-    
+
     // Set cursor to the end
     view.dispatch({ selection: { anchor: 6 } });
-    
+
     wrapper.vm.insertText!('world');
-    
+
     expect(view.state.doc.toString()).toBe('hello world');
     // Cursor should move to end of inserted text
     expect(view.state.selection.main.anchor).toBe(11);
@@ -442,9 +442,9 @@ describe('UnaEditor', () => {
     await getEditorView(wrapper);
     // Give CM a tick to build syntax tree
     await nextTick();
-    
+
     const headings = wrapper.vm.getHeadings!();
-    
+
     expect(headings).toEqual([
       { text: 'H1 Title', level: 1, line: 1 },
       { text: 'H2 Subtitle', level: 2, line: 3 },
@@ -596,5 +596,47 @@ describe('UnaEditor', () => {
 
     // Heading decoration appears after switching to livePreview
     expect(wrapper.find('.cm-hybrid-heading-1').exists()).toBe(true);
+  });
+
+  it('updates code block theme when codeTheme prop changes', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '```ts\nconst x = 1;\n```',
+        theme: 'light',
+        codeTheme: 'auto',
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    const codeLine = wrapper.find('.cm-code-block-line');
+    expect(codeLine.exists()).toBe(true);
+    expect(getComputedStyle(codeLine.element).backgroundColor).toBe('rgb(255, 255, 255)');
+
+    await wrapper.setProps({ codeTheme: 'one-dark' });
+    await nextTick();
+
+    expect(getComputedStyle(codeLine.element).backgroundColor).toBe('rgb(40, 44, 52)');
+  });
+
+  it('toggles code block line numbers at runtime', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '~~~ts\nconst x = 1;\n~~~',
+        codeLineNumbers: false,
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    expect(wrapper.find('.cm-code-block-fence').exists()).toBe(true);
+    expect(wrapper.find('.cm-code-block-line[data-code-line-number="1"]').exists()).toBe(false);
+
+    await wrapper.setProps({ codeLineNumbers: true });
+    await nextTick();
+
+    expect(wrapper.find('.cm-code-block-line[data-code-line-number="1"]').exists()).toBe(true);
   });
 });

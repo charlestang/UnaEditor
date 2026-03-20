@@ -22,6 +22,7 @@ A lightweight, high-performance Vue 3 editor component library based on CodeMirr
 - ⚡️ **Vite Driven**: Lightning-fast local development and build experience.
 - 📝 **Hybrid Markdown Rendering**: Optional hybrid rendering mode offering instant preview of headings, emphasis, code blocks, etc., within the editor.
 - ⌨️ **Vim Mode Support**: Built-in classic Vim modal editing and keybindings.
+- 🎨 **Code Block Syntax Highlighting**: Built-in multi-language syntax highlighting with 9 color schemes and optional line numbers.
 - 📦 **Dual Output Formats**: Supports both ESM and CommonJS.
 
 ## 📦 Installation
@@ -51,9 +52,40 @@ const content = ref('# Hello Una Editor!');
 </script>
 
 <template>
-  <UnaEditor v-model="content" :hybrid-markdown="true" :vim-mode="false" />
+  <UnaEditor v-model="content" :live-preview="true" :vim-mode="false" />
 </template>
 ```
+
+## 🎨 Code Block Syntax Highlighting
+
+Una Editor has built-in code block syntax highlighting with 9 color schemes and optional line numbers.
+
+```vue
+<UnaEditor
+  v-model="content"
+  code-theme="dracula"
+  :code-line-numbers="true"
+/>
+```
+
+### Available Color Schemes
+
+| Dark Themes | Light Themes |
+|-------------|-------------|
+| `one-dark` (default) | `github-light` (default) |
+| `dracula` | `solarized-light` |
+| `monokai` | `atom-one-light` |
+| `solarized-dark` | |
+| `nord` | |
+| `tokyo-night` | |
+
+Set `code-theme="auto"` to follow the editor theme (`theme="dark"` uses `one-dark`, `theme="light"` uses `github-light`).
+
+### Supported Languages
+
+**Core languages** (loaded synchronously): JavaScript/JS, TypeScript/TS, JSX, TSX, CSS, Shell/Bash
+
+**Extended languages** (lazy-loaded on demand): Python, PHP, Java, Go, Rust, C, C++
 
 ## 📖 API Documentation
 

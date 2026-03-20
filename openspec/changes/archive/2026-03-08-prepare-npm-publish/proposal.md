@@ -12,9 +12,11 @@
 ## Capabilities
 
 ### New Capabilities
+
 - `npm-distribution`: 让该项目符合 npm 包的发布规范，确保外部环境可以正确解析和使用 `una-editor`。
 
 ### Modified Capabilities
+
 无。
 
 ## Impact

@@ -9,12 +9,14 @@ UnaEditor 当前的代码字体和字号为硬编码：代码字体 `ui-monospac
 ## Goals / Non-Goals
 
 **Goals:**
+
 - 通过 props 提供正文字体、代码字体、字号三个配置维度
 - Props 是唯一的字体/字号配置入口，不提供外部 CSS 覆盖口子
 - 两种模式（livePreview / 非 livePreview）下代码字体一致生效
 - 字体/字号 props 支持运行时响应式变化，与现有 props（theme、lineNumbers、vimMode）行为一致
 
 **Non-Goals:**
+
 - 不提供标题字号的独立配置（标题字号通过 em 相对于正文自动缩放）
 - 不提供行高的独立配置
 - 不提供代码字号的独立配置（代码字号跟随正文字号）
@@ -59,6 +61,7 @@ CodeMirror 6 在 `HeightOracle` 中缓存了 `charWidth`、`lineHeight`、`textH
 **方案：** props 变化时，Vue 模板将新的字体 CSS 变量写入容器 DOM，watch 使用 `flush: 'post'` 确保在 DOM 更新完成后，dispatch 一个携带 `remeasureEffect` 的 transaction 通知 CM6 重新测量。`HybridMarkdownPlugin` 在 `update()` 里检测到该 effect 时重建 decorations。对于 `fontFamily` / `codeFontFamily` 变化，还需在 `document.fonts.ready` resolve 后再 dispatch 一次，确保自定义字体加载完成后度量值正确。
 
 **具体流程：**
+
 1. watch（`flush: 'post'`）检测到 fontFamily / codeFontFamily / fontSize 变化
 2. Vue 模板已将新的 CSS 变量（`--una-font-family` / `--una-code-font-family` / `--una-font-size`）写入容器 DOM
 3. dispatch `remeasureEffect` transaction — CM6 在正常 update cycle 里重新测量，`HybridMarkdownPlugin` 同步重建 decorations

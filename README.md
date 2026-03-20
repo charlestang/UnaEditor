@@ -22,6 +22,7 @@
 - ⚡️ **Vite 驱动**：极速的本地开发与构建体验。
 - 📝 **Hybrid Markdown 渲染**：可选的混合渲染模式，在编辑态即可获得标题、强调、代码块等元素的即时预览。
 - ⌨️ **Vim 模式支持**：内置经典的 Vim 模态编辑与键位绑定。
+- 🎨 **代码块语法高亮**：内置多语言语法高亮，支持 9 套配色方案和可选行号。
 - 📦 **双格式输出**：同时支持 ESM 和 CommonJS。
 
 ## 📦 安装
@@ -51,9 +52,40 @@ const content = ref('# Hello Una Editor!');
 </script>
 
 <template>
-  <UnaEditor v-model="content" :hybrid-markdown="true" :vim-mode="false" />
+  <UnaEditor v-model="content" :live-preview="true" :vim-mode="false" />
 </template>
 ```
+
+## 🎨 代码块语法高亮
+
+Una Editor 内置了代码块语法高亮功能，支持 9 套配色方案和可选的代码行号。
+
+```vue
+<UnaEditor
+  v-model="content"
+  code-theme="dracula"
+  :code-line-numbers="true"
+/>
+```
+
+### 支持的配色方案
+
+| 深色主题 | 浅色主题 |
+|---------|---------|
+| `one-dark` (默认) | `github-light` (默认) |
+| `dracula` | `solarized-light` |
+| `monokai` | `atom-one-light` |
+| `solarized-dark` | |
+| `nord` | |
+| `tokyo-night` | |
+
+设置 `code-theme="auto"` 可自动跟随编辑器主题（`theme="dark"` 使用 `one-dark`，`theme="light"` 使用 `github-light`）。
+
+### 支持的语言
+
+**核心语言**（同步加载）：JavaScript/JS、TypeScript/TS、JSX、TSX、CSS、Shell/Bash
+
+**扩展语言**（按需懒加载）：Python、PHP、Java、Go、Rust、C、C++
 
 ## 📖 API 文档
 

@@ -4,7 +4,10 @@ import { EditorView, keymap } from '@codemirror/view';
 import { defaultKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { vim, getCM, Vim } from '@replit/codemirror-vim';
-import { createLivePreviewExtensions, setupVimLogicalNavigation } from '../src/extensions/hybridMarkdown';
+import {
+  createLivePreviewExtensions,
+  setupVimLogicalNavigation,
+} from '../src/extensions/hybridMarkdown';
 
 if (typeof Range !== 'undefined') {
   if (!Range.prototype.getClientRects) {

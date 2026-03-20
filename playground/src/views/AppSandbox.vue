@@ -18,6 +18,8 @@ const theme = ref<'light' | 'dark'>('light');
 const fontSize = ref<number | undefined>(undefined);
 const fontFamily = ref<string | undefined>(undefined);
 const codeFontFamily = ref<string | undefined>(undefined);
+const codeTheme = ref<'auto' | 'one-dark' | 'dracula' | 'monokai' | 'solarized-dark' | 'solarized-light' | 'nord' | 'tokyo-night' | 'github-light' | 'atom-one-light'>('auto');
+const codeLineNumbers = ref(false);
 
 // Editor ref
 const editorRef = ref<EditorExposed>();
@@ -69,7 +71,9 @@ const showHeadings = () => {
     alert('No headings found.');
     return;
   }
-  const tree = headings.map(h => `${'  '.repeat(h.level - 1)}- [H${h.level}] ${h.text} (Line ${h.line})`).join('\n');
+  const tree = headings
+    .map((h) => `${'  '.repeat(h.level - 1)}- [H${h.level}] ${h.text} (Line ${h.line})`)
+    .join('\n');
   alert(`Document TOC:\n\n${tree}`);
 };
 
@@ -165,6 +169,29 @@ const testScrollToLine = () => {
           <option value="Courier New, monospace">Courier New</option>
         </select>
       </div>
+
+      <div class="control-group">
+        <label>代码主题：</label>
+        <select v-model="codeTheme">
+          <option value="auto">自动</option>
+          <option value="one-dark">One Dark</option>
+          <option value="dracula">Dracula</option>
+          <option value="monokai">Monokai</option>
+          <option value="solarized-dark">Solarized Dark</option>
+          <option value="solarized-light">Solarized Light</option>
+          <option value="nord">Nord</option>
+          <option value="tokyo-night">Tokyo Night</option>
+          <option value="github-light">GitHub Light</option>
+          <option value="atom-one-light">Atom One Light</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label>
+          <input v-model="codeLineNumbers" type="checkbox" />
+          代码行号
+        </label>
+      </div>
     </div>
 
     <div class="controls">
@@ -193,6 +220,8 @@ const testScrollToLine = () => {
         :font-size="fontSize"
         :font-family="fontFamily"
         :code-font-family="codeFontFamily"
+        :code-theme="codeTheme"
+        :code-line-numbers="codeLineNumbers"
         placeholder="请输入 Markdown 内容..."
         @change="handleChange"
         @save="handleSave"

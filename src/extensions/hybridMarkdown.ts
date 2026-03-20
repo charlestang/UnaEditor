@@ -84,13 +84,12 @@ const HYBRID_SCOPE_NODES = new Set([
   'InlineCode',
   'Image',
   'Blockquote',
-  'FencedCode',
+  // Note: FencedCode removed - handled by independent code block decorator plugin
 ]);
 
 const HYBRID_THEME = EditorView.theme({
   '.cm-una-code-font': {
-    fontFamily:
-      'var(--una-code-font-family, ui-monospace, SFMono-Regular, Menlo, monospace)',
+    fontFamily: 'var(--una-code-font-family, ui-monospace, SFMono-Regular, Menlo, monospace)',
   },
   '.cm-hybrid-heading-1': {
     fontSize: '1.875em',
@@ -132,9 +131,6 @@ const HYBRID_THEME = EditorView.theme({
     backgroundColor: 'rgba(148, 163, 184, 0.08)',
     paddingLeft: '0.75rem',
     fontStyle: 'italic',
-  },
-  '.cm-line.cm-hybrid-fenced-code-line': {
-    backgroundColor: 'rgba(15, 23, 42, 0.06)',
   },
   '.cm-hybrid-image': {
     display: 'inline-flex',
@@ -207,7 +203,9 @@ class HybridMarkdownPlugin {
   update(update: ViewUpdate): void {
     const nextScopes = getActiveScopes(update.view);
     const activeChanged = !sameScopes(this.activeScopes, nextScopes);
-    const hasRemeasure = update.transactions.some((tr) => tr.effects.some((e) => e.is(remeasureEffect)));
+    const hasRemeasure = update.transactions.some((tr) =>
+      tr.effects.some((e) => e.is(remeasureEffect)),
+    );
 
     if (
       update.docChanged ||
@@ -293,7 +291,6 @@ function sameScopes(left: HybridScope[], right: HybridScope[]): boolean {
 function isInActiveScope(node: { from: number; to: number }, scopes: HybridScope[]): boolean {
   return scopes.some((scope) => node.from >= scope.from && node.to <= scope.to);
 }
-
 
 function getBufferedVisibleRanges(view: EditorView, buffer = 160): { from: number; to: number }[] {
   const ranges = view.visibleRanges.map((range) => ({
@@ -450,7 +447,7 @@ function buildDecorations(view: EditorView, activeScopes: HybridScope[]): Decora
             view,
             node.from,
             node.to,
-            'cm-una-code-font cm-hybrid-fenced-code-line',
+            'cm-una-code-font',
           );
         }
       },
