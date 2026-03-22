@@ -9,7 +9,7 @@ This document lists the properties, events, and exposed methods provided by the 
 | Property                 | Type      | Default | Description                                                                                                |
 | ------------------------ | --------- | ------- | ---------------------------------------------------------------------------------------------------------- |
 | `modelValue` / `v-model` | `string`  | `''`    | The content of the editor.                                                                                 |
-| `livePreview`            | `boolean` | `false` | Whether to enable hybrid rendering mode. Provides a WYSIWYG experience for headings, emphasis, links, lists, task lists, and more. |
+| `livePreview`            | `boolean` | `false` | Whether to enable hybrid rendering mode. Provides a WYSIWYG experience for headings, emphasis, links, images, task lists, structured tables, and more. |
 | `vimMode`                | `boolean` | `false` | Whether to enable Vim keymap mode. Supports classic Vim modal editing (`Mod-s` is still available).        |
 | `lineNumbers`            | `boolean` | `true`  | Whether to show line numbers.                                                                              |
 | `lineWrap`               | `boolean` | `true`  | Whether to enable line wrapping.                                                                           |
@@ -29,6 +29,11 @@ This document lists the properties, events, and exposed methods provided by the 
 | Event Name          | Callback Parameters | Description                                                                         |
 | ------------------- | ------------------- | ----------------------------------------------------------------------------------- |
 | `update:modelValue` | `(value: string)`   | Triggered when the editor content changes, used for two-way binding with `v-model`. |
+| `change`            | `(value: string)`   | Triggered after the editor document actually changes.                               |
+| `save`              | `()`                | Triggered when the user invokes the save shortcut such as `Mod-s`.                  |
+| `focus`             | `()`                | Triggered when the editor receives focus.                                           |
+| `blur`              | `()`                | Triggered when the editor loses focus.                                              |
+| `drop`              | `(files: File[])`   | Triggered when image files are dropped or pasted into the editor.                   |
 
 <!-- More events can be added here later, such as focus, blur, change, etc. -->
 
@@ -43,6 +48,8 @@ If you need to call the editor's built-in methods externally, you can add a `ref
 | `insertText`       | `(text: string) => void`                                     | Inserts text at the current cursor position. If a selection exists, it will be replaced. The cursor is moved to the end of the inserted text.                                                              |
 | `getHeadings`      | `() => Array<{ text: string, level: number, line: number }>` | Extracts all Markdown headings from the document using internal AST parsing. Returns an array containing the text, level, and line number of each heading, perfect for building a Table of Contents (TOC). |
 | `scrollToLine`     | `(lineNumber: number) => void`                               | Smoothly scrolls the editor viewport so that the specified 1-based line number becomes visible.                                                                                                            |
+| `undoHistory`      | `() => boolean`                                              | Performs one undo step; returns `false` when there is no undo history available.                                                                                                                           |
+| `redoHistory`      | `() => boolean`                                              | Performs one redo step; returns `false` when there is no redo history available.                                                                                                                           |
 | `toggleFullscreen` | `(mode?: 'browser' \| 'screen') => void`                     | Toggles fullscreen mode (supports filling the browser viewport or the entire screen via native API).                                                                                                       |
 | `exitFullscreen`   | `() => void`                                                 | Exits fullscreen mode.                                                                                                                                                                                     |
 | `getEditorView`    | `() => EditorView \| undefined`                              | [Advanced] Gets the underlying CodeMirror 6 `EditorView` instance. Can be used for deep custom extensions (Note: manipulating the document directly may cause Vue's `v-model` state to desync).            |

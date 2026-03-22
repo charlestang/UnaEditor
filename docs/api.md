@@ -9,7 +9,7 @@
 | 属性名                   | 类型      | 默认值  | 说明                                                                     |
 | ------------------------ | --------- | ------- | ------------------------------------------------------------------------ |
 | `modelValue` / `v-model` | `string`  | `''`    | 编辑器内容                                                               |
-| `livePreview`            | `boolean` | `false` | 是否开启混合渲染模式。开启后会对标题、强调、链接、列表、任务列表等提供所见即所得的体验。 |
+| `livePreview`            | `boolean` | `false` | 是否开启混合渲染模式。开启后会对标题、强调、链接、图片、任务列表、结构化表格等提供所见即所得的体验。 |
 | `vimMode`                | `boolean` | `false` | 是否开启 Vim 键位模式。支持经典 Vim 模态编辑 (`Mod-s` 仍可用)。          |
 | `lineNumbers`            | `boolean` | `true`  | 是否显示行号。                                                           |
 | `lineWrap`               | `boolean` | `true`  | 是否自动换行。                                                           |
@@ -29,6 +29,11 @@
 | 事件名              | 回调参数          | 说明                                                  |
 | ------------------- | ----------------- | ----------------------------------------------------- |
 | `update:modelValue` | `(value: string)` | 编辑器内容发生改变时触发，用于 `v-model` 的双向绑定。 |
+| `change`            | `(value: string)` | 编辑器文档发生实际变更后触发。                        |
+| `save`              | `()`              | 用户触发保存快捷键（如 `Mod-s`）时触发。              |
+| `focus`             | `()`              | 编辑器获得焦点时触发。                                |
+| `blur`              | `()`              | 编辑器失去焦点时触发。                                |
+| `drop`              | `(files: File[])` | 拖拽或粘贴图片文件进入编辑器时触发。                  |
 
 <!-- 后续可在此添加更多事件的说明，如 focus, blur, change 等 -->
 
@@ -43,6 +48,8 @@
 | `insertText`       | `(text: string) => void`                                     | 在当前光标位置插入文本。如果当前存在选区，选区内容将被替换。插入后光标会自动移动到文本末尾。                                                      |
 | `getHeadings`      | `() => Array<{ text: string, level: number, line: number }>` | 利用内部 AST 解析提取文档中所有的 Markdown 标题，返回包含文本、层级和所在行号的数组，非常适合用于构建文章大纲 (TOC)。                             |
 | `scrollToLine`     | `(lineNumber: number) => void`                               | 平滑滚动编辑器视图，使得指定的行号 (1-based) 滚动到可见区域。                                                                                     |
+| `undoHistory`      | `() => boolean`                                              | 执行一次撤销；若当前没有可撤销历史则返回 `false`。                                                                                                 |
+| `redoHistory`      | `() => boolean`                                              | 执行一次重做；若当前没有可重做历史则返回 `false`。                                                                                                 |
 | `toggleFullscreen` | `(mode?: 'browser' \| 'screen') => void`                     | 切换全屏模式（支持填满浏览器窗口，或通过原生 API 填满整个屏幕）。                                                                                 |
 | `exitFullscreen`   | `() => void`                                                 | 退出全屏状态。                                                                                                                                    |
 | `getEditorView`    | `() => EditorView \| undefined`                              | 【高级接口】获取底层的 CodeMirror 6 `EditorView` 实例对象。可用于进行深度的自定义扩展（注意：直接修改文档可能导致 Vue 的 `v-model` 状态不同步）。 |

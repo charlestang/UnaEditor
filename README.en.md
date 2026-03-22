@@ -20,7 +20,8 @@ A lightweight, high-performance Vue 3 editor component library based on CodeMirr
 - 🎨 **Vue 3 Friendly**: Built entirely with the Composition API, perfectly fitting the Vue ecosystem.
 - 💪 **Type Safe**: 100% written in TypeScript with complete type inference.
 - ⚡️ **Vite Driven**: Lightning-fast local development and build experience.
-- 📝 **Hybrid Markdown Rendering**: Optional hybrid rendering mode offering instant preview of headings, emphasis, code blocks, etc., within the editor.
+- 📝 **Hybrid Markdown Rendering**: Optional hybrid rendering mode offering instant preview of headings, emphasis, images, task lists, structured tables, and more within the editor.
+- 🧩 **Structured Table Editing**: Supports structured table rendering, cell editing, row/column handles, append, and delete interactions under `livePreview`.
 - ⌨️ **Vim Mode Support**: Built-in classic Vim modal editing and keybindings.
 - 🎨 **Code Block Syntax Highlighting**: Built-in multi-language syntax highlighting with 9 color schemes and optional line numbers.
 - 📦 **Dual Output Formats**: Supports both ESM and CommonJS.
