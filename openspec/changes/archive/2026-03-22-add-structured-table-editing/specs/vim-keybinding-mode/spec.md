@@ -1,42 +1,4 @@
-# vim-keybinding-mode
-
-## Purpose
-
-定义编辑器的 Vim 模态键位行为，包括普通文档导航、结构化表格内的局部覆盖规则，以及保存快捷键等兼容性要求。
-
-## Requirements
-
-### Requirement: Editor supports switching between standard and Vim keybinding modes
-
-编辑器 SHALL 支持两种键位模式：standard 和 Vim。当 Vim 模式未启用或未配置时，编辑器 MUST 保持现有的标准编辑行为。当 Vim 模式启用时，编辑器 MUST 为当前获得焦点的编辑器实例启用 Vim 键位行为。
-
-#### Scenario: Standard mode by default
-
-- **WHEN** 调用方未启用 Vim 模式
-- **THEN** 编辑器保持现有的标准编辑行为
-- **AND** 编辑器不启用 Vim 键位
-
-#### Scenario: Enable Vim mode
-
-- **WHEN** 调用方启用 Vim 模式
-- **THEN** 编辑器为该实例启用 Vim 键位行为
-- **AND** 编辑器不再以标准文本输入行为作为当前活动编辑模式
-
-### Requirement: Vim mode starts in non-insert modal editing behavior
-
-当 Vim 模式启用时，编辑器 SHALL 使用经典的 Vim 模态编辑行为。编辑器 MUST 将 normal mode 视为默认交互状态，因此在用户显式进入 insert mode 之前，移动命令可以执行而不会直接插入文本。
-
-#### Scenario: Typing in normal mode
-
-- **WHEN** Vim 模式已启用且用户尚未进入 insert mode
-- **THEN** 普通字符按键 SHALL 按照 Vim normal mode 的规则被解释
-- **AND** 编辑器 SHALL NOT 默认把这些输入直接插入为普通文本
-
-#### Scenario: Enter insert mode
-
-- **WHEN** Vim 模式已启用且用户发出 `i` 或 `a` 等插入命令
-- **THEN** 编辑器进入 insert mode
-- **AND** 后续文本输入 SHALL 持续插入内容，直到用户退出 insert mode
+## MODIFIED Requirements
 
 ### Requirement: Arrow key navigation remains available in Vim mode
 
@@ -45,7 +7,7 @@
 #### Scenario: 普通文档区域内方向键仍按逻辑行移动
 
 - **WHEN** Vim 模式已启用且用户位于非表格区域按下方向键
-- **THEN** 编辑器 SHALL 按 Vim 的默认导航规则移动光标（逻辑行）
+- **THEN** 编辑器 SHALL 按 Vim 的默认导航规则移动光标
 - **AND** 该按键 SHALL NOT 被当作文本插入处理
 
 #### Scenario: livePreview 表格内方向键遵循表格文本光标规则
@@ -53,6 +15,8 @@
 - **WHEN** Vim 模式已启用、`livePreview` 为 `true`，且用户位于结构化表格内按下方向键
 - **THEN** 编辑器 SHALL 按结构化表格定义的文本光标导航规则处理方向键
 - **AND** 方向键行为 MUST 与同场景下非 Vim 模式的表格方向键语义保持一致
+
+## ADDED Requirements
 
 ### Requirement: Vim 模式进入表格时保持当前 mode，并落入 cell 内文本光标语境
 
@@ -70,9 +34,9 @@
 - **THEN** 编辑器 SHALL 保持 Vim insert mode
 - **AND** 目标 cell SHALL 立即进入可输入的编辑会话
 
-### Requirement: Vim 模式在表格内采用 cell 内文本光标优先的移动语义
+### Requirement: Vim normal mode 在表格内采用 cell 内文本光标优先的移动语义
 
-在结构化表格内，Vim 模式 SHALL 采用“活动 cell + cell 内文本光标”的局部覆盖规则，而不是把 normal mode 简化成纯二维格子跳转。`j` / `k` 从相邻普通文本行进入表格时 SHALL 命中边界行的第一列 cell，并将光标落在该 cell 内容起始处。进入表格后，`h` / `l` SHALL 优先在当前 cell 内容范围内逐字符移动；仅当光标位于 cell 边界时，才允许跨入左/右相邻 cell。`j` / `k` 在表格内按列移动时 SHALL 尽量保留当前 cell 内的相对字符偏移；若目标 cell 更短，则光标位置 SHALL 被夹紧到目标 cell 尾部。`w` / `b` SHALL 保持在当前 cell 内移动，不得跨入相邻 cell。
+在结构化表格内，Vim normal mode SHALL 采用“cell 内文本光标优先”的局部移动规则，而不是把 normal mode 简化成纯二维格子跳转。`j` / `k` 从相邻普通文本行进入表格时 SHALL 命中边界行第一列 cell，并将光标落在该 cell 内容起始处。进入表格后，`h` / `l` SHALL 优先在当前 cell 内容范围内逐字符移动；仅当光标位于 cell 边界时，才允许跨入左/右相邻 cell。`j` / `k` 在表格内按列移动时 SHALL 尽量保留当前 cell 内的相对字符偏移；若目标 cell 更短，则光标位置 SHALL 被夹紧到目标 cell 尾部。`w` / `b` SHALL 保持在当前 cell 内移动，不得跨入相邻 cell。
 
 #### Scenario: j 从普通文本向下进入表格时落在首个 cell 起始处
 
@@ -95,8 +59,8 @@
 #### Scenario: h 和 l 仅在 cell 边界处跨单元格移动
 
 - **WHEN** Vim 模式已启用且用户在结构化表格内按下 `h` 或 `l`，且当前光标已经位于 cell 边界
-- **THEN** 编辑器 SHALL 按左/右单元格导航规则处理该命令
-- **AND** 跨入相邻 cell 后的光标 SHALL 落在目标 cell 的对应边界位置
+- **THEN** 编辑器 SHALL 按左侧或右侧相邻 cell 进行移动
+- **AND** 目标位置 SHALL 落在目标 cell 的对应边界文本光标位置
 
 #### Scenario: j 和 k 在表格内按列移动并保留相对偏移
 
@@ -154,19 +118,3 @@
 - **WHEN** Vim 模式已启用且该表格仅剩表头行，用户在表头行执行 `dd`
 - **THEN** 编辑器 SHALL 允许删除该表头行
 - **AND** 该表格区域 SHALL 被移除出文档
-
-### Requirement: Save shortcut remains available when Vim mode is active
-
-当 Vim 模式启用时，编辑器 SHALL 保留现有的 `Mod-s` 保存快捷键。只要编辑器处于聚焦状态，Vim 模式 MUST NOT 阻止编辑器在用户触发保存快捷键时发出保存事件。
-
-#### Scenario: Save shortcut in Vim insert mode
-
-- **WHEN** Vim 模式已启用、编辑器处于聚焦状态，且用户在 insert mode 中按下 `Mod-s`
-- **THEN** 编辑器 SHALL 发出保存事件
-- **AND** 浏览器默认保存行为 SHALL 继续被阻止
-
-#### Scenario: Save shortcut in Vim normal mode
-
-- **WHEN** Vim 模式已启用、编辑器处于聚焦状态，且用户在 normal mode 中按下 `Mod-s`
-- **THEN** 编辑器 SHALL 发出保存事件
-- **AND** 浏览器默认保存行为 SHALL 继续被阻止

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { undo } from '@codemirror/commands';
 import { EditorView, keymap } from '@codemirror/view';
 import { getCM, Vim } from '@replit/codemirror-vim';
 import { nextTick } from 'vue';
@@ -29,6 +30,13 @@ async function getEditorView(wrapper: ReturnType<typeof mount>) {
 
 async function focusEditorView(view: EditorView) {
   view.focus();
+  await nextTick();
+}
+
+async function dispatchEditorKey(view: EditorView, key: string) {
+  view.focus();
+  const target = view.contentDOM;
+  target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
   await nextTick();
 }
 
@@ -339,7 +347,7 @@ describe('UnaEditor', () => {
     expect(wrapper.find('.cm-hybrid-heading-1').exists()).toBe(true);
   });
 
-  it('keeps markdown tables in source mode while hybrid rendering is enabled', async () => {
+  it('renders legal markdown tables as structured tables when live preview is enabled', async () => {
     const markdown = '| head | value |\n| --- | --- |\n| cell | text |';
     const wrapper = mount(UnaEditor, {
       props: {
@@ -350,8 +358,1271 @@ describe('UnaEditor', () => {
 
     await getEditorView(wrapper);
 
-    expect(wrapper.find('table').exists()).toBe(false);
+    expect(wrapper.find('.cm-structured-table').exists()).toBe(true);
+    expect(wrapper.find('table').exists()).toBe(true);
+    expect(wrapper.find('.cm-content').element.textContent).not.toContain('| head | value |');
+  });
+
+  it('keeps incomplete tables in source mode while live preview is enabled', async () => {
+    const markdown = '| head | value |\n| --- | --- |\n| cell |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    await getEditorView(wrapper);
+
+    expect(wrapper.find('.cm-structured-table').exists()).toBe(false);
     expect(wrapper.find('.cm-content').element.textContent).toContain('| head | value |');
+  });
+
+  it('keeps tables in source mode when live preview is disabled', async () => {
+    const markdown = '| head | value |\n| --- | --- |\n| cell | text |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: false,
+      },
+    });
+
+    await getEditorView(wrapper);
+
+    expect(wrapper.find('.cm-structured-table').exists()).toBe(false);
+    expect(wrapper.find('.cm-content').element.textContent).toContain('| head | value |');
+  });
+
+  it('opens a cell editor and writes back markdown table source', async () => {
+    const markdown = '| head | value |\n| --- | --- |\n| cell | text |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    const targetCell = wrapper.find('[data-cell-row="1"][data-cell-col="1"]');
+    expect(targetCell.exists()).toBe(true);
+
+    await targetCell.trigger('click');
+    await nextTick();
+
+    const textarea = wrapper.find('.cm-structured-table-overlay');
+    expect(textarea.exists()).toBe(true);
+    expect(textarea.classes()).toContain('cm-structured-table-overlay-visible');
+    expect(targetCell.classes()).not.toContain('cm-structured-table-cell-selected');
+
+    const element = textarea.element as HTMLTextAreaElement;
+    element.value = 'updated';
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    await nextTick();
+
+    expect(view.state.doc.toString()).toContain('| cell | updated |');
+  });
+
+  it('places the non-vim cell caret close to the click position', async () => {
+    const markdown = '| head | value |\n| --- | --- |\n| cell | text |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    const content = wrapper.find(
+      '[data-cell-row="1"][data-cell-col="1"] .cm-structured-table-cell-content',
+    );
+    const textNode = content.element.firstChild as Text;
+    const originalCaretRangeFromPoint = (
+      document as Document & {
+        caretRangeFromPoint?: (x: number, y: number) => { startContainer: Node; startOffset: number };
+      }
+    ).caretRangeFromPoint;
+
+    Object.defineProperty(document, 'caretRangeFromPoint', {
+      configurable: true,
+      value: () => ({
+        startContainer: textNode,
+        startOffset: 2,
+      }),
+    });
+
+    content.element.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, cancelable: true, clientX: 16, clientY: 8 }),
+    );
+    await nextTick();
+
+    const textarea = wrapper.find('.cm-structured-table-overlay').element as HTMLTextAreaElement;
+    expect(textarea.selectionStart).toBe(2);
+    expect(textarea.selectionEnd).toBe(2);
+
+    Object.defineProperty(document, 'caretRangeFromPoint', {
+      configurable: true,
+      value: originalCaretRangeFromPoint,
+    });
+  });
+
+  it('normalizes pasted newlines into br tags inside the active cell', async () => {
+    const markdown = '| head | value |\n| --- | --- |\n| cell | text |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    await wrapper.find('[data-cell-row="1"][data-cell-col="1"]').trigger('click');
+    await nextTick();
+
+    const textarea = wrapper.find('.cm-structured-table-overlay').element as HTMLTextAreaElement;
+    const pasteEvent = new Event('paste', { bubbles: true }) as Event & {
+      clipboardData: { getData(type: string): string };
+    };
+    pasteEvent.clipboardData = {
+      getData: (type: string) => (type === 'text/plain' ? 'text\nnext' : ''),
+    };
+
+    textarea.setSelectionRange(0, textarea.value.length);
+    textarea.dispatchEvent(pasteEvent);
+    await nextTick();
+
+    expect(view.state.doc.toString()).toContain('text<br>next');
+  });
+
+  it('keeps plain-text paste inside one cell and ignores html clipboard payloads', async () => {
+    const markdown = '| head | value |\n| --- | --- |\n| cell | text |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    await wrapper.find('[data-cell-row="1"][data-cell-col="1"]').trigger('click');
+    await nextTick();
+
+    const textarea = wrapper.find('.cm-structured-table-overlay').element as HTMLTextAreaElement;
+    const pasteEvent = new Event('paste', { bubbles: true }) as Event & {
+      clipboardData: { getData(type: string): string };
+    };
+    pasteEvent.clipboardData = {
+      getData: (type: string) => {
+        if (type === 'text/plain') return 'alpha\tbeta\nnext';
+        if (type === 'text/html') return '<table><tr><td>ignored</td></tr></table>';
+        return '';
+      },
+    };
+
+    textarea.setSelectionRange(0, textarea.value.length);
+    textarea.dispatchEvent(pasteEvent);
+    await nextTick();
+
+    expect(view.state.doc.toString()).toContain('alpha\tbeta<br>next');
+    expect(view.state.doc.toString()).not.toContain('ignored');
+    expect(view.state.doc.toString().split('\n')).toHaveLength(3);
+  });
+
+  it('preserves undo order across structured cell edit sessions', async () => {
+    const markdown = '| head | value |\n| --- | --- |\n| cell | text |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    await wrapper.find('[data-cell-row="1"][data-cell-col="0"]').trigger('click');
+    await nextTick();
+
+    let textarea = wrapper.find('.cm-structured-table-overlay').element as HTMLTextAreaElement;
+    textarea.value = 'alpha';
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await nextTick();
+
+    await wrapper.find('[data-cell-row="1"][data-cell-col="1"]').trigger('click');
+    await nextTick();
+
+    textarea = wrapper.find('.cm-structured-table-overlay').element as HTMLTextAreaElement;
+    textarea.value = 'beta';
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await nextTick();
+
+    expect(view.state.doc.toString()).toContain('| alpha | beta |');
+
+    expect(undo(view)).toBe(true);
+    await nextTick();
+    expect(view.state.doc.toString()).toContain('| alpha | text |');
+
+    expect(undo(view)).toBe(true);
+    await nextTick();
+    expect(view.state.doc.toString()).toContain('| cell | text |');
+  });
+
+  it('routes Mod-z from the active table overlay into the editor undo history', async () => {
+    const markdown = '| head | value |\n| --- | --- |\n| cell | text |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    await wrapper.find('[data-cell-row="1"][data-cell-col="0"]').trigger('click');
+    await nextTick();
+
+    let textarea = wrapper.find('.cm-structured-table-overlay').element as HTMLTextAreaElement;
+    textarea.value = 'alpha';
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await nextTick();
+
+    await wrapper.find('[data-cell-row="1"][data-cell-col="1"]').trigger('click');
+    await nextTick();
+
+    textarea = wrapper.find('.cm-structured-table-overlay').element as HTMLTextAreaElement;
+    textarea.value = 'beta';
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await nextTick();
+
+    textarea.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'z',
+        metaKey: true,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await nextTick();
+
+    expect(view.state.doc.toString()).toContain('| alpha | text |');
+  });
+
+  it('escapes plain pipes while preserving inline code pipes in table cells', async () => {
+    const markdown = '| head | value |\n| --- | --- |\n| cell | text |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    await wrapper.find('[data-cell-row="1"][data-cell-col="1"]').trigger('click');
+    await nextTick();
+
+    const textarea = wrapper.find('.cm-structured-table-overlay').element as HTMLTextAreaElement;
+    textarea.value = 'plain | `code|span`';
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await nextTick();
+
+    expect(view.state.doc.toString()).toContain('plain \\| `code|span`');
+  });
+
+  it('keeps a typed space visible in the active overlay instead of immediately trimming it away', async () => {
+    const markdown = '| head | value |\n| --- | --- |\n| alpha | beta |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    await wrapper.find('[data-cell-row="1"][data-cell-col="0"]').trigger('click');
+    await nextTick();
+
+    const textarea = wrapper.find('.cm-structured-table-overlay').element as HTMLTextAreaElement;
+    textarea.value = 'alpha ';
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await nextTick();
+
+    expect(textarea.value).toBe('alpha ');
+
+    textarea.value = 'alpha b';
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await nextTick();
+
+    expect(view.state.doc.toString()).toContain('| alpha b');
+  });
+
+  it('keeps the structured table widget visible while an active cell contains an unfinished inline code marker', async () => {
+    const markdown = '| head | value |\n| --- | --- |\n| alpha | beta |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    await wrapper.find('[data-cell-row="1"][data-cell-col="1"]').trigger('click');
+    await nextTick();
+
+    const textarea = wrapper.find('.cm-structured-table-overlay').element as HTMLTextAreaElement;
+    textarea.value = '`';
+    textarea.setSelectionRange(1, 1);
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await nextTick();
+
+    expect(view.state.doc.toString()).toContain('| alpha | ` |');
+    expect(wrapper.find('.cm-structured-table').exists()).toBe(true);
+    expect(wrapper.find('.cm-structured-table-overlay').classes()).toContain(
+      'cm-structured-table-overlay-visible',
+    );
+  });
+
+  it('keeps the editing session alive when the active cell leaves the viewport and scrolls it back on input', async () => {
+    const markdown = '| head | value |\n| --- | --- |\n| alpha | beta |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    const cell = wrapper.find('[data-cell-row="1"][data-cell-col="1"]');
+    await cell.trigger('click');
+    await nextTick();
+
+    const textarea = wrapper.find('.cm-structured-table-overlay').element as HTMLTextAreaElement;
+    expect(textarea.classList.contains('cm-structured-table-overlay-visible')).toBe(true);
+    const originalCellRect = cell.element.getBoundingClientRect.bind(cell.element);
+    const originalEditorRect = view.dom.getBoundingClientRect.bind(view.dom);
+    Object.defineProperty(cell.element, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => new DOMRect(0, 600, 120, 32),
+    });
+    Object.defineProperty(view.dom, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => new DOMRect(0, 0, 600, 300),
+    });
+
+    textarea.value = 'beta!';
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await nextTick();
+
+    expect(wrapper.find('.cm-structured-table-overlay').classes()).toContain(
+      'cm-structured-table-overlay-visible',
+    );
+    expect(view.state.doc.toString()).toContain('beta!');
+
+    Object.defineProperty(cell.element, 'getBoundingClientRect', {
+      configurable: true,
+      value: originalCellRect,
+    });
+    Object.defineProperty(view.dom, 'getBoundingClientRect', {
+      configurable: true,
+      value: originalEditorRect,
+    });
+  });
+
+  it('uses Enter and Tab to navigate and append rows in structured tables', async () => {
+    const markdown = '| head | value |\n| --- | --- |\n| cell | text |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    await wrapper.find('[data-cell-row="1"][data-cell-col="1"]').trigger('click');
+    await nextTick();
+
+    const textarea = wrapper.find('.cm-structured-table-overlay').element as HTMLTextAreaElement;
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await nextTick();
+
+    expect(view.state.doc.toString()).toContain('|  |  |');
+    expect(wrapper.find('[data-cell-row="2"][data-cell-col="1"]').exists()).toBe(true);
+
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    await nextTick();
+
+    expect(wrapper.find('[data-cell-row="2"][data-cell-col="0"]').exists()).toBe(true);
+  });
+
+  it('enters the structured table from adjacent plain-text lines with ArrowDown in standard mode', async () => {
+    const markdown =
+      'intro\n\n| head | value |\n| --- | --- |\n| alpha | beta |\n\noutro';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+
+    view.dispatch({ selection: { anchor: markdown.indexOf('\n\n') + 1 } });
+    await dispatchEditorKey(view, 'ArrowDown');
+
+    const textarea = wrapper.find('.cm-structured-table-overlay').element as HTMLTextAreaElement;
+    expect(textarea.classList.contains('cm-structured-table-overlay-visible')).toBe(true);
+    expect(view.state.selection.main.head).toBe(markdown.indexOf('head'));
+    expect(textarea.selectionStart).toBe(0);
+  });
+
+  it('does not skip a blank line before entering a structured table with ArrowDown in standard mode', async () => {
+    const markdown =
+      '## heading\n\n| head | value |\n| --- | --- |\n| alpha | beta |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    const headingLine = view.state.doc.line(1);
+    view.dispatch({ selection: { anchor: headingLine.from } });
+
+    await dispatchEditorKey(view, 'ArrowDown');
+
+    expect(view.state.doc.lineAt(view.state.selection.main.head).number).toBe(2);
+    expect(wrapper.find('.cm-structured-table-overlay').classes()).not.toContain(
+      'cm-structured-table-overlay-visible',
+    );
+    expect(wrapper.find('.cm-structured-table-cell-active').exists()).toBe(false);
+  });
+
+  it('requests scroll into view when ArrowDown moves the caret in non-vim mode', async () => {
+    const markdown = 'line 1\nline 2\nline 3\nline 4';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    view.dispatch({ selection: { anchor: view.state.doc.line(1).from } });
+    const dispatchSpy = vi.spyOn(view, 'dispatch');
+
+    await dispatchEditorKey(view, 'ArrowDown');
+
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userEvent: 'select.livepreview-vertical',
+        scrollIntoView: true,
+      }),
+    );
+  });
+
+  it('leaves the table instead of appending rows when ArrowDown is pressed from the last row', async () => {
+    const markdown = '| head | value |\n| --- | --- |\n| cell | text |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    await wrapper.find('[data-cell-row="1"][data-cell-col="1"]').trigger('click');
+    await nextTick();
+
+    const before = view.state.doc.toString();
+    const textarea = wrapper.find('.cm-structured-table-overlay').element as HTMLTextAreaElement;
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    await nextTick();
+
+    expect(view.state.doc.toString()).toBe(before);
+    expect(wrapper.find('.cm-structured-table-overlay').classes()).not.toContain(
+      'cm-structured-table-overlay-visible',
+    );
+  });
+
+  it('exits the active cell when clicking outside the table and keeps the external caret position', async () => {
+    const markdown =
+      'intro text\n\n| head | value |\n| --- | --- |\n| alpha | beta |\n\noutro text';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    await wrapper.find('[data-cell-row="1"][data-cell-col="1"]').trigger('click');
+    await nextTick();
+    const textarea = wrapper.find('.cm-structured-table-overlay').element as HTMLTextAreaElement;
+    expect(wrapper.find('.cm-structured-table-overlay').classes()).toContain(
+      'cm-structured-table-overlay-visible',
+    );
+
+    const outsidePosition = markdown.indexOf('outro');
+    view.dispatch({ selection: { anchor: outsidePosition } });
+    await wrapper.find('.cm-content').trigger('click');
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+    await nextTick();
+
+    expect(wrapper.find('.cm-structured-table-overlay').classes()).not.toContain(
+      'cm-structured-table-overlay-visible',
+    );
+    expect(document.activeElement).not.toBe(textarea);
+
+    const beforeMove = view.state.selection.main.head;
+    await dispatchEditorKey(view, 'ArrowRight');
+    expect(view.state.selection.main.head).toBe(beforeMove + 1);
+  });
+
+  it('leaves the last table cell without keeping the bottom-right cell active', async () => {
+    const markdown =
+      'intro\n\n| h1 | h2 | h3 |\n| --- | --- | --- |\n| a | b | c |\n| d | e | f |\n\noutro';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    await wrapper.find('[data-cell-row="2"][data-cell-col="2"]').trigger('click');
+    await nextTick();
+
+    const textarea = wrapper.find('.cm-structured-table-overlay').element as HTMLTextAreaElement;
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    await nextTick();
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    await nextTick();
+
+    expect(wrapper.find('.cm-structured-table-overlay').classes()).not.toContain(
+      'cm-structured-table-overlay-visible',
+    );
+    expect(wrapper.findAll('.cm-structured-table-cell-active')).toHaveLength(0);
+    expect(view.state.doc.lineAt(view.state.selection.main.head).number).toBe(7);
+  });
+
+  it('keeps the same cell in editing mode when clicking its overlay again', async () => {
+    const markdown = '| head | value |\n| --- | --- |\n| alpha | beta |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    await wrapper.find('[data-cell-row="1"][data-cell-col="1"]').trigger('click');
+    await nextTick();
+
+    const overlay = wrapper.find('.cm-structured-table-overlay');
+    expect(overlay.classes()).toContain('cm-structured-table-overlay-visible');
+    expect(wrapper.find('[data-cell-row="1"][data-cell-col="1"]').classes()).toContain(
+      'cm-structured-table-cell-active',
+    );
+
+    overlay.element.dispatchEvent(
+      new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 }),
+    );
+    overlay.element.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }),
+    );
+    await nextTick();
+
+    expect(wrapper.find('.cm-structured-table-overlay').classes()).toContain(
+      'cm-structured-table-overlay-visible',
+    );
+    expect(wrapper.find('[data-cell-row="1"][data-cell-col="1"]').classes()).toContain(
+      'cm-structured-table-cell-active',
+    );
+  });
+
+  it('switches directly to the next clicked cell on the first pointer interaction', async () => {
+    const markdown =
+      '| feature | status | notes |\n| :--- | :---: | ---: |\n| navigation | ready | directions |\n| source fallback | stable | keep source |\n| image | ![demo](https://placehold.co/120x72/0f172a/ffffff?text=Cell) | preview |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    const firstCell = wrapper.find('[data-cell-row="2"][data-cell-col="2"]');
+    firstCell.element.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 }));
+    firstCell.element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+    await nextTick();
+
+    let overlay = wrapper.find('.cm-structured-table-overlay').element as HTMLTextAreaElement;
+    expect(overlay.classList.contains('cm-structured-table-overlay-visible')).toBe(true);
+    expect(wrapper.find('[data-cell-row="2"][data-cell-col="2"]').classes()).toContain(
+      'cm-structured-table-cell-active',
+    );
+
+    const nextCell = wrapper.find('[data-cell-row="3"][data-cell-col="0"]');
+    nextCell.element.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 }));
+    nextCell.element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+    await nextTick();
+
+    overlay = wrapper.find('.cm-structured-table-overlay').element as HTMLTextAreaElement;
+    expect(overlay.classList.contains('cm-structured-table-overlay-visible')).toBe(true);
+    expect(wrapper.find('[data-cell-row="3"][data-cell-col="0"]').classes()).toContain(
+      'cm-structured-table-cell-active',
+    );
+    expect(wrapper.find('[data-cell-row="2"][data-cell-col="2"]').classes()).not.toContain(
+      'cm-structured-table-cell-active',
+    );
+  });
+
+  it('deletes the last empty row with Backspace from the first cell start', async () => {
+    const markdown = '| head | value |\n| --- | --- |\n|  |  |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    await wrapper.find('[data-cell-row="1"][data-cell-col="0"]').trigger('click');
+    await nextTick();
+
+    const textarea = wrapper.find('.cm-structured-table-overlay').element as HTMLTextAreaElement;
+    textarea.setSelectionRange(0, 0);
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true }));
+    await nextTick();
+
+    expect(view.state.doc.toString()).toBe('| head | value |\n| --- | --- |');
+  });
+
+  it('renders inline markdown features and whitelisted br tags in inactive cells', async () => {
+    const markdown =
+      '| head | value |\n| --- | --- |\n| **bold** [link](https://example.com) `code|span` | first<br>second ![alt](https://example.com/image.png) |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    const firstCell = wrapper.find('[data-cell-row="1"][data-cell-col="0"]');
+    const secondCell = wrapper.find('[data-cell-row="1"][data-cell-col="1"]');
+
+    expect(firstCell.find('strong').text()).toBe('bold');
+    expect(firstCell.find('.cm-structured-table-link').attributes('href')).toBe('https://example.com');
+    expect(firstCell.find('.cm-structured-table-inline-code').text()).toBe('code|span');
+    expect(secondCell.find('br').exists()).toBe(true);
+    expect(secondCell.find('.cm-structured-table-image').attributes('src')).toBe(
+      'https://example.com/image.png',
+    );
+  });
+
+  it('keeps the first table line number visible in the gutter when a table is replaced by a widget', async () => {
+    const markdown =
+      'intro\n\n| head | value |\n| --- | --- |\n| alpha | beta |\n\noutro';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+        lineNumbers: true,
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    const gutterTexts = wrapper
+      .findAll('.cm-lineNumbers .cm-gutterElement')
+      .map((item) => item.text().trim())
+      .filter(Boolean);
+
+    expect(gutterTexts).toContain('3');
+    expect(gutterTexts).toContain('7');
+  });
+
+  it('reveals markdown image source when a vim normal-mode caret enters the active cell', async () => {
+    const markdown =
+      '| head | value |\n| --- | --- |\n| ![alt](https://example.com/image.png) | text |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+        vimMode: true,
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    await wrapper.find('[data-cell-row="1"][data-cell-col="0"]').trigger('click');
+    await nextTick();
+
+    const cell = wrapper.find('[data-cell-row="1"][data-cell-col="0"]');
+    expect(cell.classes()).toContain('cm-structured-table-cell-active');
+    expect(cell.find('.cm-structured-table-image').exists()).toBe(false);
+    expect(cell.find('.cm-structured-table-cell-content').text()).toContain(
+      '![alt](https://example.com/image.png)',
+    );
+  });
+
+  it('requests a remeasure when structured table preview images are mounted', async () => {
+    const markdown =
+      '| head | value |\n| --- | --- |\n| text | ![alt](https://example.com/image.png) |';
+    const requestMeasureSpy = vi.spyOn(EditorView.prototype, 'requestMeasure');
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    const image = wrapper.find('.cm-structured-table-image');
+    expect(image.exists()).toBe(true);
+    expect(requestMeasureSpy).toHaveBeenCalled();
+  });
+
+  it('renders neutral controls and supports append and delete row and column actions', async () => {
+    const markdown = '| h1 | h2 | h3 |\n| --- | --- | --- |\n| a | b | c |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    expect(wrapper.find('.cm-structured-table-control-row').exists()).toBe(false);
+    expect(wrapper.find('.cm-structured-table-footer-row').exists()).toBe(false);
+
+    await wrapper.find('[data-action="append-column"]').trigger('click');
+    await nextTick();
+    expect(view.state.doc.toString()).toContain('| h1 | h2 | h3 |  |');
+
+    await wrapper.find('[data-action="append-row"]').trigger('click');
+    await nextTick();
+    expect(view.state.doc.toString()).toContain('|  |  |  |  |');
+
+    const columnHandle = wrapper.find('[data-structure-kind="column"][data-structure-index="3"]');
+    await columnHandle.trigger('contextmenu', { clientX: 24, clientY: 24, button: 2 });
+    await nextTick();
+    await wrapper.find('[data-action="menu-delete"]').trigger('click');
+    await nextTick();
+    expect(view.state.doc.toString()).not.toContain('| h1 | h2 | h3 |  |');
+
+    const rowHandle = wrapper.find('[data-structure-kind="row"][data-structure-index="2"]');
+    await rowHandle.trigger('contextmenu', { clientX: 24, clientY: 24, button: 2 });
+    await nextTick();
+    await wrapper.find('[data-action="menu-delete"]').trigger('click');
+    await nextTick();
+
+    expect(view.state.doc.toString()).not.toContain('|  |  |  |');
+  });
+
+  it('removes the whole table when the last remaining column is deleted from the structure menu', async () => {
+    const markdown = 'before\n\n| only |\n| --- |\n| value |\n\nafter';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    const columnHandle = wrapper.find('[data-structure-kind="column"][data-structure-index="0"]');
+    await columnHandle.trigger('contextmenu', { clientX: 24, clientY: 24, button: 2 });
+    await nextTick();
+    await wrapper.find('[data-action="menu-delete"]').trigger('click');
+    await nextTick();
+
+    expect(view.state.doc.toString()).toContain('before');
+    expect(view.state.doc.toString()).toContain('after');
+    expect(view.state.doc.toString()).not.toContain('| only |');
+    expect(view.state.doc.toString()).not.toContain('| --- |');
+    expect(view.state.doc.toString()).not.toContain('| value |');
+    expect(wrapper.find('.cm-table-widget').exists()).toBe(false);
+  });
+
+  it('uses only structure selection styling when a column handle is clicked during cell editing', async () => {
+    const markdown = '| h1 | h2 | h3 |\n| --- | --- | --- |\n| a | b | c |\n| d | e | f |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    await wrapper.find('[data-cell-row="2"][data-cell-col="2"]').trigger('click');
+    await nextTick();
+    expect(wrapper.find('.cm-structured-table-overlay').classes()).toContain(
+      'cm-structured-table-overlay-visible',
+    );
+
+    await wrapper
+      .find('[data-structure-kind="column"][data-structure-index="2"]')
+      .trigger('click');
+    await nextTick();
+
+    expect(wrapper.find('.cm-structured-table-overlay').classes()).not.toContain(
+      'cm-structured-table-overlay-visible',
+    );
+    expect(wrapper.findAll('.cm-structured-table-cell-active')).toHaveLength(0);
+    expect(wrapper.find('[data-cell-row="0"][data-cell-col="2"]').classes()).toContain(
+      'cm-structured-table-cell-selected',
+    );
+    expect(wrapper.find('[data-cell-row="2"][data-cell-col="2"]').classes()).toContain(
+      'cm-structured-table-cell-selected',
+    );
+  });
+
+  it('allows deleting a selected column by right-clicking inside the selected column region', async () => {
+    const markdown = '| h1 | h2 | h3 |\n| --- | --- | --- |\n| a | b | c |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    await wrapper
+      .find('[data-structure-kind="column"][data-structure-index="1"]')
+      .trigger('click');
+    await nextTick();
+
+    await wrapper.find('[data-cell-row="1"][data-cell-col="1"]').trigger('contextmenu', {
+      clientX: 24,
+      clientY: 24,
+      button: 2,
+    });
+    await nextTick();
+    await wrapper.find('[data-action="menu-delete"]').trigger('click');
+    await nextTick();
+
+    expect(view.state.doc.toString()).toContain('| h1 | h3 |');
+    expect(view.state.doc.toString()).not.toContain('| h1 | h2 | h3 |');
+    expect(view.state.doc.toString()).toContain('| a | c |');
+  });
+
+  it('reveals row and column handles only for the hovered edge cell and shows floating add buttons on the table edge', async () => {
+    const markdown = '| h1 | h2 |\n| --- | --- |\n| a | b |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    const rowHandle = wrapper.find('[data-row-handle="true"][data-structure-index="1"]');
+    const colHandle = wrapper.find('[data-col-handle="true"][data-structure-index="0"]');
+    const sideAdd = wrapper.find('[data-side-add="true"]');
+    const bottomAdd = wrapper.find('[data-bottom-add="true"]');
+
+    expect(rowHandle.classes()).not.toContain('cm-structured-table-handle-visible');
+    expect(colHandle.classes()).not.toContain('cm-structured-table-handle-visible');
+    expect(sideAdd.classes()).not.toContain('cm-structured-table-add-visible');
+    expect(bottomAdd.classes()).not.toContain('cm-structured-table-add-visible');
+
+    await wrapper.find('[data-cell-row="1"][data-cell-col="0"]').trigger('mousemove');
+    await nextTick();
+    expect(rowHandle.classes()).toContain('cm-structured-table-handle-visible');
+    expect(bottomAdd.classes()).toContain('cm-structured-table-add-visible');
+
+    await wrapper.find('[data-cell-row="0"][data-cell-col="0"]').trigger('mousemove');
+    await nextTick();
+    expect(colHandle.classes()).toContain('cm-structured-table-handle-visible');
+
+    colHandle.element.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, cancelable: true }));
+    await nextTick();
+    expect(colHandle.classes()).toContain('cm-structured-table-handle-visible');
+
+    await wrapper.find('[data-cell-row="1"][data-cell-col="1"]').trigger('mousemove');
+    await nextTick();
+    expect(sideAdd.classes()).toContain('cm-structured-table-add-visible');
+  });
+
+  it('removes the whole table when the last remaining column is deleted from the context menu', async () => {
+    const markdown = 'before\n\n| head |\n| --- |\n| cell |\n\nafter';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    const columnHandle = wrapper.find('[data-structure-kind="column"][data-structure-index="0"]');
+    await columnHandle.trigger('contextmenu', { clientX: 24, clientY: 24, button: 2 });
+    await nextTick();
+    await wrapper.find('[data-action="menu-delete"]').trigger('click');
+    await nextTick();
+
+    expect(view.state.doc.toString()).toContain('before');
+    expect(view.state.doc.toString()).toContain('after');
+    expect(view.state.doc.toString()).not.toContain('| head |');
+    expect(view.state.doc.toString()).not.toContain('| --- |');
+    expect(view.state.doc.toString()).not.toContain('| cell |');
+  });
+
+  it('keeps global vim navigation intact before reaching a structured table', async () => {
+    const markdown =
+      'line 1\nline 2\nline 3\n\n| head | value |\n| --- | --- |\n| alpha | beta |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+        vimMode: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    const cm = getCM(view);
+    expect(cm).not.toBeNull();
+
+    await focusEditorView(view);
+    expect(view.state.doc.lineAt(view.state.selection.main.head).number).toBe(1);
+
+    Vim.handleKey(cm!, 'j', 'test');
+    await nextTick();
+    expect(view.state.doc.lineAt(view.state.selection.main.head).number).toBe(2);
+
+    Vim.handleKey(cm!, 'j', 'test');
+    await nextTick();
+    expect(view.state.doc.lineAt(view.state.selection.main.head).number).toBe(3);
+    expect(wrapper.find('.cm-structured-table-cell-active').exists()).toBe(false);
+  });
+
+  it('enters the structured table from adjacent plain-text lines in vim normal mode', async () => {
+    const markdown =
+      'intro\n\n| head | value |\n| --- | --- |\n| alpha | beta |\n\noutro';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+        vimMode: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    const cm = getCM(view);
+    expect(cm).not.toBeNull();
+    await focusEditorView(view);
+
+    view.dispatch({ selection: { anchor: markdown.indexOf('\n\n') + 1 } });
+    Vim.handleKey(cm!, 'j', 'test');
+    await nextTick();
+    const textarea = wrapper.find('.cm-structured-table-overlay').element as HTMLTextAreaElement;
+    expect(
+      wrapper.find('[data-cell-row="0"][data-cell-col="0"]').classes(),
+    ).toContain('cm-structured-table-cell-active');
+    expect(view.state.selection.main.head).toBe(markdown.indexOf('head'));
+    expect(textarea.classList.contains('cm-structured-table-overlay-visible')).toBe(false);
+    expect(view.coordsAtPos(view.state.selection.main.head)).not.toBeNull();
+
+    view.dispatch({ selection: { anchor: markdown.lastIndexOf('\n\noutro') + 1 } });
+    await nextTick();
+    Vim.handleKey(cm!, 'k', 'test');
+    await nextTick();
+    expect(
+      wrapper.find('[data-cell-row="1"][data-cell-col="0"]').classes(),
+    ).toContain('cm-structured-table-cell-active');
+    expect(view.state.selection.main.head).toBe(markdown.indexOf('alpha'));
+  });
+
+  it('keeps vim normal mode on the main selection and enters insert mode with i', async () => {
+    const markdown = '| head | value |\n| --- | --- |\n| alpha | beta |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+        vimMode: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    const cm = getCM(view);
+    expect(cm).not.toBeNull();
+    await nextTick();
+
+    await wrapper.find('[data-cell-row="1"][data-cell-col="0"]').trigger('click');
+    await nextTick();
+
+    const textarea = wrapper.find('.cm-structured-table-overlay').element as HTMLTextAreaElement;
+    expect(textarea.classList.contains('cm-structured-table-overlay-visible')).toBe(false);
+    expect(cm!.state.vim?.insertMode).toBe(false);
+    expect(view.coordsAtPos(view.state.selection.main.head)).not.toBeNull();
+
+    await dispatchEditorKey(view, 'i');
+    await nextTick();
+
+    expect(cm!.state.vim?.insertMode).toBe(true);
+    expect(textarea.classList.contains('cm-structured-table-overlay-visible')).toBe(true);
+    expect(textarea.readOnly).toBe(false);
+  });
+
+  it('returns control to the main selection on Escape inside a table cell', async () => {
+    const markdown = '| head | value |\n| --- | --- |\n| alpha | beta |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+        vimMode: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    const cm = getCM(view);
+    expect(cm).not.toBeNull();
+    await nextTick();
+
+    await wrapper.find('[data-cell-row="1"][data-cell-col="0"]').trigger('click');
+    await nextTick();
+
+    const textarea = wrapper.find('.cm-structured-table-overlay').element as HTMLTextAreaElement;
+    await dispatchEditorKey(view, 'i');
+    await nextTick();
+    expect(cm!.state.vim?.insertMode).toBe(true);
+    expect(textarea.classList.contains('cm-structured-table-overlay-visible')).toBe(true);
+
+    textarea.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+    );
+    await nextTick();
+
+    expect(cm!.state.vim?.insertMode).toBe(false);
+    expect(textarea.classList.contains('cm-structured-table-overlay-visible')).toBe(false);
+    expect(view.coordsAtPos(view.state.selection.main.head)).not.toBeNull();
+  });
+
+  it('supports local vim table navigation and protects the header row on dd', async () => {
+    const markdown = '| head | value |\n| --- | --- |\n| alpha beta | text |\n| gamma | tail |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+        vimMode: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    const cm = getCM(view);
+    expect(cm).not.toBeNull();
+    await nextTick();
+
+    await wrapper.find('[data-cell-row="1"][data-cell-col="0"]').trigger('click');
+    await nextTick();
+    const alphaStart = markdown.indexOf('alpha beta');
+    const gammaStart = markdown.indexOf('gamma');
+    const gammaLength = 'gamma'.length;
+    const tailStart = markdown.indexOf('tail');
+    expect(view.state.selection.main.head).toBe(alphaStart);
+
+    await dispatchEditorKey(view, 'l');
+    expect(wrapper.find('[data-cell-row="1"][data-cell-col="0"]').classes()).toContain(
+      'cm-structured-table-cell-active',
+    );
+    expect(view.state.selection.main.head).toBe(alphaStart + 1);
+
+    await dispatchEditorKey(view, 'l');
+    await dispatchEditorKey(view, 'l');
+    expect(view.state.selection.main.head).toBe(alphaStart + 3);
+
+    await dispatchEditorKey(view, 'j');
+    expect(wrapper.find('[data-cell-row="2"][data-cell-col="0"]').classes()).toContain(
+      'cm-structured-table-cell-active',
+    );
+    expect(view.state.selection.main.head).toBe(gammaStart + 3);
+
+    await dispatchEditorKey(view, 'h');
+    expect(wrapper.find('[data-cell-row="2"][data-cell-col="0"]').classes()).toContain(
+      'cm-structured-table-cell-active',
+    );
+    expect(view.state.selection.main.head).toBe(gammaStart + 2);
+
+    for (let index = 0; index < gammaLength - 2; index += 1) {
+      await dispatchEditorKey(view, 'l');
+    }
+    expect(view.state.selection.main.head).toBe(gammaStart + gammaLength);
+
+    await dispatchEditorKey(view, 'l');
+    expect(wrapper.find('[data-cell-row="2"][data-cell-col="1"]').classes()).toContain(
+      'cm-structured-table-cell-active',
+    );
+    expect(view.state.selection.main.head).toBe(tailStart);
+
+    await wrapper.find('[data-cell-row="0"][data-cell-col="0"]').trigger('click');
+    await nextTick();
+    const beforeHeaderDelete = view.state.doc.toString();
+    Vim.handleKey(cm!, 'd', 'test');
+    Vim.handleKey(cm!, 'd', 'test');
+    await nextTick();
+    expect(view.state.doc.toString()).toBe(beforeHeaderDelete);
+
+    await wrapper.find('[data-cell-row="2"][data-cell-col="0"]').trigger('click');
+    await nextTick();
+    expect(
+      wrapper.find('[data-cell-row="2"][data-cell-col="0"]').classes(),
+    ).toContain('cm-structured-table-cell-active');
+
+    Vim.handleKey(cm!, 'd', 'test');
+    Vim.handleKey(cm!, 'd', 'test');
+    await nextTick();
+    expect(view.state.doc.toString()).not.toContain('| gamma | tail |');
+  });
+
+  it('removes the whole table when vim dd is used on the header row of a header-only table', async () => {
+    const markdown = 'before\n\n| head | value |\n| --- | --- |\n\nafter';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+        vimMode: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    const cm = getCM(view);
+    expect(cm).not.toBeNull();
+    await nextTick();
+
+    await wrapper.find('[data-cell-row="0"][data-cell-col="0"]').trigger('click');
+    await nextTick();
+
+    Vim.handleKey(cm!, 'd', 'test');
+    Vim.handleKey(cm!, 'd', 'test');
+    await nextTick();
+
+    expect(view.state.doc.toString()).toContain('before');
+    expect(view.state.doc.toString()).toContain('after');
+    expect(view.state.doc.toString()).not.toContain('| head | value |');
+    expect(view.state.doc.toString()).not.toContain('| --- | --- |');
+    expect(wrapper.find('.cm-table-widget').exists()).toBe(false);
+    expect(view.state.selection.main.head).toBeLessThanOrEqual(view.state.doc.length);
+  });
+
+  it('moves from the final document line to the blank line first, then re-enters the last table row with k in vim normal mode', async () => {
+    const markdown =
+      '| feature | status | notes |\n| --- | --- | --- |\n| navigation | ready | text |\n| image | demo | rendered |\n\n| action | shortcut | result |\n| --- | --- | --- |\n| move down | Enter | row |\n| move up | Shift+Enter | row |\n| paste | text/plain | row |\n\nabcdef';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+        vimMode: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    const cm = getCM(view);
+    expect(cm).not.toBeNull();
+    await focusEditorView(view);
+
+    const belowTextLine = view.state.doc.line(view.state.doc.lines);
+    view.dispatch({
+      selection: {
+        anchor: belowTextLine.from + 3,
+      },
+    });
+    await nextTick();
+
+    Vim.handleKey(cm!, 'k', 'test');
+    await nextTick();
+    expect(view.state.doc.lineAt(view.state.selection.main.head).number).toBe(11);
+
+    Vim.handleKey(cm!, 'k', 'test');
+    await nextTick();
+    expect(view.state.doc.lineAt(view.state.selection.main.head).number).toBe(10);
+    expect(view.state.selection.main.head).toBe(markdown.indexOf('paste'));
+    expect(wrapper.find('[data-cell-row="3"][data-cell-col="0"]').classes()).toContain(
+      'cm-structured-table-cell-active',
+    );
+  });
+
+  it('uses the real keydown path to move from the final document line to the blank line before re-entering a table with k', async () => {
+    const markdown =
+      '# title\n\n| feature | status | notes |\n| --- | --- | --- |\n| navigation | ready | text |\n| image | demo | rendered |\n\n| action | shortcut | result |\n| --- | --- | --- |\n| move down | Enter | row |\n| move up | Shift+Enter | row |\n| paste | text/plain | row |\n\nabcdef';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+        vimMode: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await focusEditorView(view);
+
+    const finalLine = view.state.doc.line(view.state.doc.lines);
+    view.dispatch({
+      selection: {
+        anchor: finalLine.from + 2,
+      },
+    });
+    await nextTick();
+
+    await dispatchEditorKey(view, 'k');
+    expect(view.state.doc.lineAt(view.state.selection.main.head).number).toBe(13);
+
+    await dispatchEditorKey(view, 'k');
+    expect(view.state.doc.lineAt(view.state.selection.main.head).number).toBe(12);
+    expect(view.state.selection.main.head).toBe(markdown.indexOf('paste'));
   });
 
   it('renders standard unordered list markers in live preview', async () => {

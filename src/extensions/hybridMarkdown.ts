@@ -3,6 +3,7 @@ import { syntaxTree } from '@codemirror/language';
 import { Prec, StateEffect, type Extension, type Range } from '@codemirror/state';
 import type { DecorationSet, ViewUpdate } from '@codemirror/view';
 import { Vim } from '@replit/codemirror-vim';
+import { createStructuredTableExtensions, enterStructuredTableFromAdjacentText } from './structuredTable';
 
 // Effect dispatched after font CSS variables are updated, to signal
 // HybridMarkdownPlugin to rebuild decorations within a real transaction.
@@ -23,8 +24,16 @@ export function setupVimLogicalNavigation() {
 
       const direction = motionArgs.forward ? 1 : -1;
       const count = motionArgs.repeat || 1;
+      const headIndex = cm.indexFromPos(head);
 
-      const currentLine = view.state.doc.lineAt(cm.indexFromPos(head));
+      if (
+        count === 1 &&
+        enterStructuredTableFromAdjacentText(view, direction, false, headIndex)
+      ) {
+        return cm.posFromIndex(view.state.selection.main.head);
+      }
+
+      const currentLine = view.state.doc.lineAt(headIndex);
       const targetLineNumber = currentLine.number + direction * count;
 
       if (targetLineNumber < 1) {
@@ -648,6 +657,7 @@ function moveByLogicalLine(view: EditorView, direction: 1 | -1): boolean {
   view.dispatch({
     selection: { anchor: targetPos },
     userEvent: 'select.livepreview-vertical',
+    scrollIntoView: true,
   });
 
   return true;
@@ -670,6 +680,7 @@ const goalColumnResetPlugin = ViewPlugin.fromClass(
 export function createLivePreviewExtensions(): Extension {
   return [
     HYBRID_THEME,
+    createStructuredTableExtensions(),
     goalColumnResetPlugin,
     Prec.highest(
       keymap.of([

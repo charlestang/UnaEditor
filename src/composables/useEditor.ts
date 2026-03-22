@@ -1,8 +1,8 @@
 import { ref, watch, onMounted, onBeforeUnmount, type Ref } from 'vue';
 import { EditorState, Compartment, Prec } from '@codemirror/state';
 import { EditorView, keymap, placeholder as placeholderExt, lineNumbers } from '@codemirror/view';
-import { defaultKeymap } from '@codemirror/commands';
-import { markdown } from '@codemirror/lang-markdown';
+import { defaultKeymap, history, historyKeymap, redo, undo } from '@codemirror/commands';
+import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { syntaxTree, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { vim, Vim } from '@replit/codemirror-vim';
@@ -12,6 +12,7 @@ import {
   setupVimLogicalNavigation,
   remeasureEffect,
 } from '../extensions/hybridMarkdown';
+import { isStructuredTableOverlayTarget, setupStructuredTableVim } from '../extensions/structuredTable';
 import { createLanguageDescriptions } from '../extensions/languageSupport';
 import { createCodeBlockDecoratorExtension } from '../extensions/codeBlockDecorator';
 import { createCodeThemeExtension } from '../extensions/codeThemeExtension';
@@ -123,6 +124,12 @@ export function useEditor(
     if (!container.value) return;
 
     const extensions = [
+      // Undo/redo history
+      history(),
+
+      // History keymap
+      keymap.of(historyKeymap),
+
       // Basic keymap
       keymap.of(defaultKeymap),
 
@@ -142,6 +149,7 @@ export function useEditor(
 
       // Markdown language support with syntax highlighting and nested code languages
       markdown({
+        base: markdownLanguage,
         codeLanguages: createLanguageDescriptions(),
       }),
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
@@ -197,7 +205,10 @@ export function useEditor(
         focus: () => {
           emit('focus');
         },
-        blur: () => {
+        blur: (event) => {
+          if (isStructuredTableOverlayTarget(event.relatedTarget)) {
+            return;
+          }
           emit('blur');
         },
         // Image drag handler
@@ -241,6 +252,7 @@ export function useEditor(
       });
       // Fix arrow keys and j/k to follow logical line navigation (Vim convention)
       setupVimLogicalNavigation();
+      setupStructuredTableVim();
     }
   });
 
@@ -328,6 +340,7 @@ export function useEditor(
         Vim.defineEx('write', 'w', () => {
           emit('save');
         });
+        setupStructuredTableVim();
       }
     },
   );
@@ -495,6 +508,16 @@ export function useEditor(
     }
   };
 
+  const undoHistory = () => {
+    if (!editorView.value) return false;
+    return undo(editorView.value);
+  };
+
+  const redoHistory = () => {
+    if (!editorView.value) return false;
+    return redo(editorView.value);
+  };
+
   return {
     editorView,
     focus,
@@ -503,5 +526,7 @@ export function useEditor(
     insertText,
     getHeadings,
     scrollToLine,
+    undoHistory,
+    redoHistory,
   };
 }

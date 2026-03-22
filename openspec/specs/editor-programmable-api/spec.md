@@ -2,7 +2,7 @@
 
 ## Purpose
 
-TBD
+定义编辑器对外暴露的程序化控制能力，包括底层 EditorView 访问、内容插入、标题提取与按行滚动等开发者接口。
 
 ## Requirements
 

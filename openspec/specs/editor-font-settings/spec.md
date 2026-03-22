@@ -1,4 +1,10 @@
-## ADDED Requirements
+# editor-font-settings
+
+## Purpose
+
+定义编辑器正文字体、代码字体与字号的可配置行为，以及这些设置在运行时变化后如何保持稳定测量、光标定位和滚动表现。
+
+## Requirements
 
 ### Requirement: 正文字体可配置
 

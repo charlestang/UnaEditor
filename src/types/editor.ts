@@ -102,6 +102,8 @@ export interface EditorExposed {
   insertText: (text: string) => void;
   getHeadings: () => Heading[];
   scrollToLine: (lineNumber: number) => void;
+  undoHistory: () => boolean;
+  redoHistory: () => boolean;
 }
 
 // Locale types

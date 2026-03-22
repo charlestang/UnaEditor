@@ -1,4 +1,10 @@
-## ADDED Requirements
+# editor-line-wrap
+
+## Purpose
+
+定义编辑器长文本换行能力的默认行为和运行时切换要求，确保调用方可以稳定控制内容是否自动折行并保持编辑状态连续。
+
+## Requirements
 
 ### Requirement: configurable line wrapping
 

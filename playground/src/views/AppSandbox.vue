@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { getCM } from '@replit/codemirror-vim';
 import { UnaEditor, version } from 'una-editor';
 import type { EditorExposed } from 'una-editor';
 
 // Editor state
 const content = ref(
-  '# Hello UnaEditor\n\n这是一个基于 CodeMirror 6 的 Markdown 编辑器。\n\n## 功能特性\n\n- 支持 v-model 双向绑定\n- 支持行号显示\n- 支持 Hybrid Markdown 渲染\n- 支持国际化（中英文）\n- 支持亮色/暗色主题\n- 支持全屏模式\n- 支持图片拖拽和粘贴\n- 支持 Mod-s 保存快捷键\n\n### 列表预览\n\n- 无序列表会以更接近阅读态的 bullet 显示\n* `*` 和 `+` 这类标准 marker 也支持\n+ 混合和嵌套列表可以继续编辑\n1. 有序列表支持 `.` 分隔符\n2) 也支持 `)` 分隔符\n\n- [ ] Task list 会显示为只读 checkbox\n- [x] 点击 checkbox 不会直接切换状态，仍然通过源码编辑\n\n> 这是一段 blockquote，用来演示首期的保守增强效果。\n\n`inline code`、**bold**、*italic* 和 [link](https://codemirror.net/) 都可以在 hybrid 模式下看到更接近渲染态的显示。\n\n![UnaEditor Demo](https://placehold.co/320x160/orange/white?text=UnaEditor)\n\n```ts\nfunction greet(name: string) {\n  return `Hello, ${name}`;\n}\n```\n\n| feature | status |\n| --- | --- |\n| tables | source mode |\n\n试试编辑这段文字，或者拖拽图片到编辑器中！',
+  '# Hello UnaEditor\n\n这是一个基于 CodeMirror 6 的 Markdown 编辑器。\n\n## 功能特性\n\n- 支持 v-model 双向绑定\n- 支持行号显示\n- 支持 Hybrid Markdown 渲染\n- 支持国际化（中英文）\n- 支持亮色/暗色主题\n- 支持全屏模式\n- 支持图片拖拽和粘贴\n- 支持 Mod-s 保存快捷键\n\n### 列表预览\n\n- 无序列表会以更接近阅读态的 bullet 显示\n* `*` 和 `+` 这类标准 marker 也支持\n+ 混合和嵌套列表可以继续编辑\n1. 有序列表支持 `.` 分隔符\n2) 也支持 `)` 分隔符\n\n- [ ] Task list 会显示为只读 checkbox\n- [x] 点击 checkbox 不会直接切换状态，仍然通过源码编辑\n\n> 这是一段 blockquote，用来演示首期的保守增强效果。\n\n`inline code`、**bold**、*italic* 和 [link](https://codemirror.net/) 都可以在 hybrid 模式下看到更接近渲染态的显示。\n\n![UnaEditor Demo](https://placehold.co/320x160/orange/white?text=UnaEditor)\n\n```ts\nfunction greet(name: string) {\n  return `Hello, ${name}`;\n}\n```\n\n## 表格结构化编辑\n\n| feature | status | notes |\n| :--- | :---: | ---: |\n| navigation | ready | 方向键、Enter、Tab |\n| multiline | rendered | 第一行<br>第二行<br/>第三行 |\n| source fallback | stable | 关闭 Live Preview 或写出不完整表格即可回源码 |\n| image | ![demo](https://placehold.co/120x72/0f172a/ffffff?text=Cell) | 图片也会在非活动 cell 渲染 |\n\n| action | shortcut | result |\n| --- | --- | --- |\n| move down | Enter | 最后一行会自动补新行 |\n| move up | Shift+Enter | 首行保持不动 |\n| paste | text/plain | 多行纯文本会转成 `<br>` |\n| vim | `j/k/h/l` | normal / insert 都可继续验证 |\n\n### 源码兜底样例\n\n下面这段故意损坏了一行列数，应该保持源码态，不进入结构化表格：\n\n| broken | table | sample |\n| --- | --- | --- |\n| only two cells | fallback |\n\n试试点击单元格编辑、右键 `:::` handle、点击边缘 `+` handle、切换 Vim normal / insert，或者观察这段损坏表格的源码兜底行为。',
 );
 
 // Editor options
@@ -65,6 +66,64 @@ const handleInsertText = () => {
   editorRef.value?.focus();
 };
 
+const runEditorHistory = (kind: 'undo' | 'redo') => {
+  const view = editorRef.value?.getEditorView();
+  if (!view) return;
+
+  const isMac = /Mac|iPhone|iPad|iPod/i.test(window.navigator.platform);
+  const overlay = view.dom.querySelector<HTMLTextAreaElement>('.cm-structured-table-overlay-visible');
+  const target = overlay ?? view.contentDOM;
+  const key = kind === 'redo' && !isMac ? 'y' : 'z';
+  const withShift = kind === 'redo' && isMac;
+
+  const invoke = () => {
+    if (overlay) {
+      overlay.focus();
+    } else {
+      view.focus();
+    }
+
+    target.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key,
+        metaKey: isMac,
+        ctrlKey: !isMac,
+        shiftKey: withShift,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    target.dispatchEvent(
+      new KeyboardEvent('keyup', {
+        key,
+        metaKey: isMac,
+        ctrlKey: !isMac,
+        shiftKey: withShift,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  };
+
+  window.setTimeout(() => {
+    if (typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(() => {
+        invoke();
+      });
+    } else {
+      invoke();
+    }
+  }, 0);
+};
+
+const handleUndo = () => {
+  runEditorHistory('undo');
+};
+
+const handleRedo = () => {
+  runEditorHistory('redo');
+};
+
 const showHeadings = () => {
   const headings = editorRef.value?.getHeadings();
   if (!headings || headings.length === 0) {
@@ -86,6 +145,14 @@ const testScrollToLine = () => {
     }
   }
 };
+
+const formatLineNumber = (lineNumber: number) => String(lineNumber).padStart(3, ' ');
+
+const contentWithLineNumbers = () =>
+  content.value
+    .split('\n')
+    .map((line, index) => `${formatLineNumber(index + 1)} | ${line}`)
+    .join('\n');
 </script>
 
 <template>
@@ -196,6 +263,8 @@ const testScrollToLine = () => {
 
     <div class="controls">
       <button @click="focusEditor">聚焦编辑器</button>
+      <button type="button" @mousedown.prevent @click.prevent="handleUndo">撤销</button>
+      <button type="button" @mousedown.prevent @click.prevent="handleRedo">重做</button>
       <button @click="getSelectedText">获取选中文本</button>
       <button @click="handleInsertText">插入文本</button>
       <button @click="showHeadings">提取大纲 (TOC)</button>
@@ -231,7 +300,7 @@ const testScrollToLine = () => {
 
     <div class="output">
       <h3>当前内容（{{ content.length }} 字符）：</h3>
-      <pre>{{ content }}</pre>
+      <pre>{{ contentWithLineNumbers() }}</pre>
     </div>
   </div>
 </template>

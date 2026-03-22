@@ -1,4 +1,10 @@
-## ADDED Requirements
+# markdown-editor
+
+## Purpose
+
+定义 `UnaEditor` 组件的核心编辑器能力，包括内容绑定、显示选项、交互事件、程序化方法和基础可配置项。
+
+## Requirements
 
 ### Requirement: Content editing with v-model binding
 

@@ -81,6 +81,8 @@ const {
   insertText,
   getHeadings,
   scrollToLine,
+  undoHistory,
+  redoHistory,
 } = useEditor(editorContainer, props, emit);
 const { toggleFullscreen, exitFullscreen } = useFullscreen(
   editorContainer,
@@ -97,6 +99,8 @@ defineExpose<EditorExposed>({
   insertText,
   getHeadings,
   scrollToLine,
+  undoHistory,
+  redoHistory,
 });
 </script>
 

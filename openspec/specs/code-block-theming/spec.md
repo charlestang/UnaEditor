@@ -1,100 +1,98 @@
-# 能力：代码块主题
+# code-block-theming
 
-## 新增需求
+## Purpose
 
-### 需求：代码块必须支持独立的主题配置
+定义代码块主题系统，包括独立主题配置、自动主题跟随、内置主题集合、动态切换、样式隔离性以及整体可读性要求。
 
-代码块必须拥有独立于主编辑器主题的主题配置。
+## Requirements
 
-#### 场景：代码块主题与编辑器主题不同
+### Requirement: 代码块必须支持独立的主题配置
 
-- **当** 编辑器主题为 "dark" 且 codeTheme 属性为 "dracula" 时
-- **则** 编辑器必须使用 dark 主题，而代码块必须使用 Dracula 配色方案
+代码块 MUST 拥有独立于主编辑器主题的主题配置。
 
-#### 场景：深色编辑器中的浅色代码块
+#### Scenario: 代码块主题与编辑器主题不同
 
-- **当** 编辑器主题为 "dark" 且 codeTheme 属性为 "github-light" 时
-- **则** 代码块必须以浅色背景和浅色主题颜色显示
+- **WHEN** 编辑器主题为 `dark` 且 `codeTheme` 属性为 `dracula`
+- **THEN** 编辑器 MUST 使用 `dark` 主题
+- **AND** 代码块 MUST 使用 Dracula 配色方案
 
-#### 场景：浅色编辑器中的深色代码块
+#### Scenario: 深色编辑器中的浅色代码块
 
-- **当** 编辑器主题为 "light" 且 codeTheme 属性为 "monokai" 时
-- **则** 代码块必须以深色背景和 Monokai 颜色显示
+- **WHEN** 编辑器主题为 `dark` 且 `codeTheme` 属性为 `github-light`
+- **THEN** 代码块 MUST 以浅色背景和浅色主题颜色显示
 
-### 需求：编辑器必须支持自动主题模式
+#### Scenario: 浅色编辑器中的深色代码块
 
-当 codeTheme 设置为 "auto" 时，代码块必须跟随编辑器主题。
+- **WHEN** 编辑器主题为 `light` 且 `codeTheme` 属性为 `monokai`
+- **THEN** 代码块 MUST 以深色背景和 Monokai 颜色显示
 
-#### 场景：深色编辑器的自动主题
+### Requirement: 编辑器必须支持自动主题模式
 
-- **当** 编辑器主题为 "dark" 且 codeTheme 为 "auto" 时
-- **则** 代码块必须使用 "one-dark" 主题
+当 `codeTheme` 设置为 `auto` 时，代码块 MUST 跟随编辑器主题。
 
-#### 场景：浅色编辑器的自动主题
+#### Scenario: 深色编辑器的自动主题
 
-- **当** 编辑器主题为 "light" 且 codeTheme 为 "auto" 时
-- **则** 代码块必须使用 "github-light" 主题
+- **WHEN** 编辑器主题为 `dark` 且 `codeTheme` 为 `auto`
+- **THEN** 代码块 MUST 使用 `one-dark` 主题
 
-### 需求：编辑器必须支持 9 种预定义配色方案
+#### Scenario: 浅色编辑器的自动主题
 
-编辑器必须为代码块提供 9 种内置配色方案。
+- **WHEN** 编辑器主题为 `light` 且 `codeTheme` 为 `auto`
+- **THEN** 代码块 MUST 使用 `github-light` 主题
 
-#### 场景：深色主题选项
+### Requirement: 编辑器必须支持预定义配色方案
 
-- **当** 用户将 codeTheme 设置为以下任一值："one-dark"、"dracula"、"monokai"、"solarized-dark"、"nord"、"tokyo-night" 时
-- **则** 代码块必须以所选深色主题颜色显示
+编辑器 MUST 为代码块提供预定义的深色与浅色主题选项。
 
-#### 场景：浅色主题选项
+#### Scenario: 深色主题选项
 
-- **当** 用户将 codeTheme 设置为以下任一值："github-light"、"solarized-light"、"atom-one-light" 时
-- **则** 代码块必须以所选浅色主题颜色显示
+- **WHEN** 用户将 `codeTheme` 设置为 `one-dark`、`dracula`、`monokai`、`solarized-dark`、`nord` 或 `tokyo-night`
+- **THEN** 代码块 MUST 以所选深色主题颜色显示
 
-### 需求：主题必须为所有语法标记类型定义颜色
+#### Scenario: 浅色主题选项
 
-每个主题必须为所有常见语法标记提供颜色定义。
+- **WHEN** 用户将 `codeTheme` 设置为 `github-light`、`solarized-light` 或 `atom-one-light`
+- **THEN** 代码块 MUST 以所选浅色主题颜色显示
 
-#### 场景：完整的标记覆盖
+### Requirement: 主题必须覆盖常见语法标记并保持可读性
 
-- **当** 代码块使用任何主题时
-- **则** 主题必须为以下内容定义颜色：关键字、函数、字符串、数字、注释、运算符、变量、类型、常量、属性、标签、属性、正则表达式和转义序列
+每个主题 MUST 为常见语法标记提供颜色定义，并且 MUST 保持足够的前景背景对比度。
 
-### 需求：主题更改必须立即生效
+#### Scenario: 完整的标记覆盖
 
-主题更改必须立即生效，无需重新加载编辑器。
+- **WHEN** 代码块使用任何主题
+- **THEN** 主题 MUST 为关键字、函数、字符串、数字、注释、运算符、变量、类型、常量、属性、标签、正则表达式和转义序列定义颜色
 
-#### 场景：动态主题切换
+#### Scenario: 最低对比度要求
 
-- **当** 用户更改 codeTheme 属性值时
-- **则** 代码块必须立即更新以显示新主题颜色
+- **WHEN** 应用任何主题时
+- **THEN** 前景色和背景色 MUST 具有足够的对比度以确保可读性
 
-#### 场景：编辑器主题更改影响自动模式
+### Requirement: 主题更改必须立即生效且仅隔离到代码块
 
-- **当** codeTheme 为 "auto" 且编辑器 theme 属性更改时
-- **则** 代码块必须立即更新以匹配新的编辑器主题
+主题更改 MUST 立即生效，且代码块主题 MUST NOT 影响主编辑器内容的样式。
 
-### 需求：主题必须仅隔离到代码块
+#### Scenario: 动态主题切换
 
-代码块主题不得影响主编辑器内容的样式。
+- **WHEN** 用户更改 `codeTheme` 属性值时
+- **THEN** 代码块 MUST 立即更新以显示新主题颜色
 
-#### 场景：主题隔离
+#### Scenario: 编辑器主题更改影响自动模式
 
-- **当** 代码块使用与编辑器不同的主题时
-- **则** 代码块外的 markdown 内容必须保持编辑器主题样式
+- **WHEN** `codeTheme` 为 `auto` 且编辑器 `theme` 属性更改时
+- **THEN** 代码块 MUST 立即更新以匹配新的编辑器主题
 
-### 需求：无效的主题名称必须优雅降级
+#### Scenario: 主题隔离
 
-当提供无效的主题名称时，编辑器必须使用默认主题。
+- **WHEN** 代码块使用与编辑器不同的主题时
+- **THEN** 代码块外的 Markdown 内容 MUST 保持编辑器主题样式
 
-#### 场景：未知主题名称
+### Requirement: 无效的主题名称必须优雅降级
 
-- **当** codeTheme 属性设置为无法识别的值时
-- **则** 编辑器必须记录警告并根据编辑器主题使用默认主题（dark 用 one-dark，light 用 github-light）
+当提供无效的主题名称时，编辑器 MUST 使用默认主题。
 
-### 需求：主题必须保持可读性和对比度
+#### Scenario: 未知主题名称
 
-所有主题必须提供足够的对比度以确保可读性。
-
-#### 场景：最低对比度要求
-
-- **当** 应用任何主题时
-- **则** 前景色和背景色必须具有足够的对比度以确保可读性
+- **WHEN** `codeTheme` 属性设置为无法识别的值
+- **THEN** 编辑器 MUST 记录警告
+- **AND** 系统 MUST 根据编辑器主题使用默认主题（`dark` 用 `one-dark`，`light` 用 `github-light`）

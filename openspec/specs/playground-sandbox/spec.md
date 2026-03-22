@@ -2,7 +2,7 @@
 
 ## Purpose
 
-TBD
+Define a dedicated local sandbox route for regression testing and exploratory editor development without landing-page presentation constraints.
 
 ## Requirements
 
@@ -31,9 +31,15 @@ The sandbox view SHALL contain the original raw `UnaEditor` playground component
 - **THEN** its sample content SHALL include a richer mix of Markdown syntax and editor features than the landing page demo
 - **AND** that content SHALL be suitable for manually validating rendering, interaction, and option combinations
 
+#### Scenario: Developer validates transaction-sensitive editor behavior in sandbox
+
+- **WHEN** the developer validates transaction-sensitive interactions such as structured-table editing in `/sandbox`
+- **THEN** the sandbox SHALL provide explicit undo and redo entry points for the current editor instance instead of relying on a single platform shortcut path
+- **AND** those entry points SHALL allow continued manual regression testing without forcing the developer to leave the current validation context
+
 ### Requirement: Default Local Development Routing
 
-The local development server (`pnpm dev`) SHOULD allow developers to easily access the sandbox for iteration.
+The local development server (`pnpm dev`) SHALL allow developers to easily access the sandbox for iteration.
 
 #### Scenario: Developer starts the dev server
 
