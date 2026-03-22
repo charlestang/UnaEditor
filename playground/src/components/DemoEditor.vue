@@ -5,8 +5,20 @@ import { UnaEditor } from 'una-editor';
 
 const { t } = useI18n();
 
+type DemoCodeTheme =
+  | 'auto'
+  | 'one-dark'
+  | 'dracula'
+  | 'monokai'
+  | 'solarized-dark'
+  | 'nord'
+  | 'tokyo-night'
+  | 'github-light'
+  | 'solarized-light'
+  | 'atom-one-light';
+
 const editorTheme = ref<'light' | 'dark'>('dark');
-const codeTheme = ref<'auto' | string>('auto');
+const codeTheme = ref<DemoCodeTheme>('auto');
 const wrapperClass = computed(() =>
   editorTheme.value === 'light' ? 'editor-wrapper-light' : 'editor-wrapper-dark',
 );
@@ -16,7 +28,7 @@ const editorThemeOptions = computed(() => [
   { label: t('demo.controls.dark'), value: 'dark' },
 ]);
 
-const codeThemeOptions = computed(() => [
+const codeThemeOptions = computed<Array<{ label: string; value: DemoCodeTheme }>>(() => [
   { label: t('demo.controls.auto'), value: 'auto' },
   { label: 'One Dark', value: 'one-dark' },
   { label: 'Dracula', value: 'dracula' },
