@@ -14,6 +14,7 @@ import {
   normalizeCellText,
   normalizePastedText,
   parseInlinePreviewText,
+  type TableAlignment,
   type TableMapping,
 } from './structuredTableModel';
 
@@ -210,7 +211,7 @@ const STRUCTURED_TABLE_THEME = EditorView.theme({
   },
   '.cm-structured-table-header-cell': {
     fontWeight: '600',
-    backgroundColor: 'transparent',
+    backgroundColor: 'var(--una-table-header-bg, rgba(15, 23, 42, 0.04))',
   },
   '.cm-structured-table-cell-content': {
     minHeight: '1.15rem',
@@ -424,6 +425,9 @@ class StructuredTableWidget extends WidgetType {
       cellElement.dataset.contentFrom = String(cell.contentFrom);
       cellElement.dataset.contentTo = String(cell.contentTo);
       cellElement.dataset.action = 'focus-cell';
+      const alignment = resolveColumnTextAlign(this.table.alignments[cell.col]);
+      cellElement.dataset.align = alignment;
+      cellElement.style.textAlign = alignment;
       if (cell.col === 0) {
         cellElement.dataset.firstCol = 'true';
       }
@@ -2440,6 +2444,17 @@ function getClampedCellPosition(
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+function resolveColumnTextAlign(alignment: TableAlignment): 'left' | 'center' | 'right' {
+  switch (alignment) {
+    case 'center':
+      return 'center';
+    case 'right':
+      return 'right';
+    default:
+      return 'left';
+  }
 }
 
 function estimateStructuredTableHeight(table: TableMapping): number {

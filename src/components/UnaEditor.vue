@@ -61,6 +61,8 @@ const containerStyle = computed(() => {
   if (props.fontSize !== undefined) {
     style['--una-font-size'] = `${props.fontSize}px`;
   }
+  style['--una-table-header-bg'] =
+    props.theme === 'dark' ? 'rgba(148, 163, 184, 0.12)' : 'rgba(15, 23, 42, 0.04)';
   return style;
 });
 

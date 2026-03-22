@@ -363,6 +363,70 @@ describe('UnaEditor', () => {
     expect(wrapper.find('.cm-content').element.textContent).not.toContain('| head | value |');
   });
 
+  it('applies delimiter alignment to both header and body cells in structured tables', async () => {
+    const markdown = '| left | center | right |\n| :--- | :---: | ---: |\n| a | b | c |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    const headerLeft = wrapper.find('[data-cell-row="0"][data-cell-col="0"]');
+    const headerCenter = wrapper.find('[data-cell-row="0"][data-cell-col="1"]');
+    const headerRight = wrapper.find('[data-cell-row="0"][data-cell-col="2"]');
+    const bodyLeft = wrapper.find('[data-cell-row="1"][data-cell-col="0"]');
+    const bodyCenter = wrapper.find('[data-cell-row="1"][data-cell-col="1"]');
+    const bodyRight = wrapper.find('[data-cell-row="1"][data-cell-col="2"]');
+
+    expect((headerLeft.element as HTMLElement).style.textAlign).toBe('left');
+    expect((headerCenter.element as HTMLElement).style.textAlign).toBe('center');
+    expect((headerRight.element as HTMLElement).style.textAlign).toBe('right');
+    expect((bodyLeft.element as HTMLElement).style.textAlign).toBe('left');
+    expect((bodyCenter.element as HTMLElement).style.textAlign).toBe('center');
+    expect((bodyRight.element as HTMLElement).style.textAlign).toBe('right');
+  });
+
+  it('renders structured table headers with a subtle theme-aware background color', async () => {
+    const markdown = '| head | value |\n| --- | --- |\n| cell | text |';
+    const lightWrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+        theme: 'light',
+      },
+    });
+
+    await getEditorView(lightWrapper);
+    await nextTick();
+
+    const lightHeader = lightWrapper.find('[data-cell-row="0"][data-cell-col="1"]');
+    expect(lightHeader.exists()).toBe(true);
+    expect((lightWrapper.element as HTMLElement).style.getPropertyValue('--una-table-header-bg')).toBe(
+      'rgba(15, 23, 42, 0.04)',
+    );
+
+    const darkWrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+        theme: 'dark',
+      },
+    });
+
+    await getEditorView(darkWrapper);
+    await nextTick();
+
+    const darkHeader = darkWrapper.find('[data-cell-row="0"][data-cell-col="1"]');
+    expect(darkHeader.exists()).toBe(true);
+    expect((darkWrapper.element as HTMLElement).style.getPropertyValue('--una-table-header-bg')).toBe(
+      'rgba(148, 163, 184, 0.12)',
+    );
+  });
+
   it('keeps incomplete tables in source mode while live preview is enabled', async () => {
     const markdown = '| head | value |\n| --- | --- |\n| cell |';
     const wrapper = mount(UnaEditor, {

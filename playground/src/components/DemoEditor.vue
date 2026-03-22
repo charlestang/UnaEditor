@@ -51,6 +51,7 @@ A lightweight, high-performance **Vue 3** editor component library based on Code
 - Edit this text directly
 - Toggle **Live Preview** above to see WYSIWYG headings and emphasis
 - Toggle **Vim Mode** to use classic modal editing (\`j\`, \`k\`, \`i\`, \`esc\`)
+- Try the **structured table** below to see cell editing in live preview
 - Try different **Code Themes** and enable **Line Numbers**
 
 ### Rich Markdown Preview
@@ -62,6 +63,15 @@ This editor renders **bold**, *italic*, and ***bold italic*** text in place whil
 - [x] Checked tasks still fall back to Markdown source when you edit them
 
 > Blockquotes, links like [CodeMirror](https://codemirror.net/), and inline code such as \`const count = ref(0)\` are all part of the same editing surface.
+
+### Structured Table Preview
+
+| Capability | Status | Notes |
+| :--- | :---: | ---: |
+| Cell editing | Ready | Click any cell to edit |
+| Alignment | Active | Header follows GFM delimiter syntax |
+| Line breaks | Stable | First line<br>Second line |
+| Vim motion | Supported | Try \`j\` / \`k\` / \`h\` / \`l\` |
 
 ### TypeScript Example
 
