@@ -333,6 +333,313 @@ describe('UnaEditor', () => {
     expect(wrapper.find('.cm-content').element.textContent).toContain(markdown);
   });
 
+  it('applies image render hooks for transformed src and metadata', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '\n![Alt](https://example.com/demo.png "Preview")',
+        livePreview: true,
+        renderHooks: {
+          image: ({ src, title }) => ({
+            src: `https://img-proxy.example.com/?url=${encodeURIComponent(src)}&title=${title ?? ''}`,
+            className: 'proxy-image hero-shot',
+            dataset: {
+              proxyKind: 'cdn',
+            },
+            style: {
+              borderColor: 'rgb(255, 0, 0)',
+              borderWidth: '2px',
+              borderStyle: 'solid',
+            },
+          }),
+        },
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    const image = wrapper.find('.cm-hybrid-image-element');
+    expect(image.exists()).toBe(true);
+    expect(image.attributes('src')).toContain(
+      'https://img-proxy.example.com/?url=https%3A%2F%2Fexample.com%2Fdemo.png',
+    );
+    expect(image.classes()).toContain('proxy-image');
+    expect(image.classes()).toContain('hero-shot');
+    expect(image.attributes('data-proxy-kind')).toBe('cdn');
+    expect(image.attributes('style')).toContain('border-color: rgb(255, 0, 0);');
+    expect(image.attributes('style')).toContain('border-width: 2px;');
+  });
+
+  it('applies link render hooks while preserving nested inline formatting', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '\n[**bold** link](./docs/page.md "Docs")',
+        livePreview: true,
+        renderHooks: {
+          link: ({ href, title }) => ({
+            href: `/resolved${href}?title=${title ?? ''}`,
+            className: 'is-internal',
+            dataset: {
+              kind: 'internal',
+              href: 'user-should-not-win',
+            },
+            style: {
+              textDecorationColor: 'rgb(34, 197, 94)',
+            },
+          }),
+        },
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    const enhancedSegments = wrapper.findAll('.cm-hybrid-link');
+    expect(
+      enhancedSegments.some((segment) => segment.attributes('data-href') === '/resolved./docs/page.md?title=Docs'),
+    ).toBe(true);
+    expect(
+      enhancedSegments.some((segment) => segment.attributes('data-kind') === 'internal'),
+    ).toBe(true);
+    expect(
+      enhancedSegments.some((segment) => segment.attributes('data-href') === 'user-should-not-win'),
+    ).toBe(false);
+    expect(
+      enhancedSegments.some((segment) => segment.attributes('style').includes('text-decoration-color')),
+    ).toBe(true);
+    expect(enhancedSegments.some((segment) => segment.classes().includes('is-internal'))).toBe(true);
+    expect(wrapper.find('.cm-hybrid-strong').text()).toBe('bold');
+    expect(wrapper.find('.cm-content').element.textContent).not.toContain('**');
+  });
+
+  it('keeps default rendering when hooks are absent or only partially provided', async () => {
+    const markdown = '\n[Docs](./guide)\n![Alt](https://example.com/demo.png)';
+
+    const defaultWrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    await getEditorView(defaultWrapper);
+    await nextTick();
+
+    const defaultLinkSegments = defaultWrapper.findAll('.cm-hybrid-link');
+    expect(defaultLinkSegments.some((segment) => segment.attributes('data-href'))).toBe(false);
+    expect(defaultWrapper.find('.cm-hybrid-image-element').attributes('data-proxy-kind')).toBeUndefined();
+
+    const imageOnlyWrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+        renderHooks: {
+          image: ({ src }) => ({
+            src: `${src}?image-only=true`,
+            dataset: { proxyKind: 'image-only' },
+          }),
+        },
+      },
+    });
+
+    await getEditorView(imageOnlyWrapper);
+    await nextTick();
+
+    expect(imageOnlyWrapper.find('.cm-hybrid-image-element').attributes('src')).toContain(
+      '?image-only=true',
+    );
+    expect(imageOnlyWrapper.find('.cm-hybrid-image-element').attributes('data-proxy-kind')).toBe(
+      'image-only',
+    );
+    expect(imageOnlyWrapper.findAll('.cm-hybrid-link').some((segment) => segment.attributes('data-href'))).toBe(
+      false,
+    );
+
+    const linkOnlyWrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+        renderHooks: {
+          link: ({ href }) => ({
+            href: `/link-only${href}`,
+            dataset: { source: 'link-only' },
+          }),
+        },
+      },
+    });
+
+    await getEditorView(linkOnlyWrapper);
+    await nextTick();
+
+    expect(linkOnlyWrapper.findAll('.cm-hybrid-link').some((segment) => segment.attributes('data-href') === '/link-only./guide')).toBe(
+      true,
+    );
+    expect(linkOnlyWrapper.findAll('.cm-hybrid-link').some((segment) => segment.attributes('data-source') === 'link-only')).toBe(
+      true,
+    );
+    expect(linkOnlyWrapper.find('.cm-hybrid-image-element').attributes('src')).toBe(
+      'https://example.com/demo.png',
+    );
+    expect(linkOnlyWrapper.find('.cm-hybrid-image-element').attributes('data-source')).toBeUndefined();
+  });
+
+  it('falls back to original values when hooks throw or return nothing', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '\n[Docs](./guide)\n![Alt](https://example.com/demo.png)',
+        livePreview: true,
+        renderHooks: {
+          image: () => {
+            throw new Error('image failed');
+          },
+          link: () => undefined,
+        },
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    expect(wrapper.find('.cm-hybrid-image-element').attributes('src')).toBe('https://example.com/demo.png');
+    expect(wrapper.findAll('.cm-hybrid-link').some((segment) => segment.attributes('data-href') === './guide')).toBe(
+      true,
+    );
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    warnSpy.mockRestore();
+  });
+
+  it('reconfigures live preview when renderHooks props change at runtime', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '\n[Docs](./guide)\n![Alt](https://example.com/demo.png)',
+        livePreview: true,
+        renderHooks: {
+          image: ({ src }) => ({
+            src: `${src}?version=1`,
+          }),
+          link: ({ href }) => ({
+            href: `/v1${href}`,
+          }),
+        },
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    expect(wrapper.find('.cm-hybrid-image-element').attributes('src')).toContain('?version=1');
+    expect(wrapper.findAll('.cm-hybrid-link').some((segment) => segment.attributes('data-href') === '/v1./guide')).toBe(
+      true,
+    );
+
+    await wrapper.setProps({
+      renderHooks: {
+        image: ({ src }) => ({
+          src: `${src}?version=2`,
+        }),
+        link: ({ href }) => ({
+          href: `/v2${href}`,
+        }),
+      },
+    });
+    await nextTick();
+    await nextTick();
+
+    expect(wrapper.find('.cm-hybrid-image-element').attributes('src')).toContain('?version=2');
+    expect(wrapper.findAll('.cm-hybrid-link').some((segment) => segment.attributes('data-href') === '/v2./guide')).toBe(
+      true,
+    );
+  });
+
+  it('does not invoke render hooks when live preview is disabled', async () => {
+    const imageHook = vi.fn();
+    const linkHook = vi.fn();
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '\n[Docs](./guide)\n![Alt](https://example.com/demo.png)',
+        livePreview: false,
+        renderHooks: {
+          image: imageHook,
+          link: linkHook,
+        },
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    expect(imageHook).not.toHaveBeenCalled();
+    expect(linkHook).not.toHaveBeenCalled();
+    expect(wrapper.find('.cm-hybrid-image').exists()).toBe(false);
+  });
+
+  it('keeps active scope source mode when render hooks are enabled', async () => {
+    const linkMarkdown = '[Docs](./guide)';
+    const imageMarkdown = '![Alt](https://example.com/demo.png)';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: `\n${linkMarkdown}\n${imageMarkdown}`,
+        livePreview: true,
+        renderHooks: {
+          image: ({ src }) => ({ src: `${src}?hooked=true` }),
+          link: ({ href }) => ({ href: `/hooked${href}` }),
+        },
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await focusEditorView(view);
+
+    expect(wrapper.find('.cm-hybrid-image').exists()).toBe(true);
+    expect(wrapper.find('.cm-hybrid-link').exists()).toBe(true);
+
+    view.dispatch({
+      selection: {
+        anchor: 4,
+      },
+    });
+    await nextTick();
+
+    expect(wrapper.find('.cm-hybrid-link').exists()).toBe(false);
+    expect(wrapper.find('.cm-content').element.textContent).toContain(linkMarkdown);
+
+    view.dispatch({
+      selection: {
+        anchor: linkMarkdown.length + 5,
+      },
+    });
+    await nextTick();
+
+    expect(wrapper.find('.cm-hybrid-image').exists()).toBe(false);
+    expect(wrapper.find('.cm-content').element.textContent).toContain(imageMarkdown);
+  });
+
+  it('ignores attempts to change visible link text from render hooks', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '\n[Original Label](./guide)',
+        livePreview: true,
+        renderHooks: {
+          link: ({ href }) =>
+            ({
+              href: `/preserved${href}`,
+              text: 'Mutated Label',
+            }) as unknown as { href: string; text: string },
+        },
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    expect(wrapper.find('.cm-content').element.textContent).toContain('Original Label');
+    expect(wrapper.find('.cm-content').element.textContent).not.toContain('Mutated Label');
+    expect(
+      wrapper.findAll('.cm-hybrid-link').some((segment) => segment.attributes('data-href') === '/preserved./guide'),
+    ).toBe(true);
+  });
+
   it('keeps the first heading rendered while the editor is blurred on initial mount', async () => {
     const wrapper = mount(UnaEditor, {
       props: {

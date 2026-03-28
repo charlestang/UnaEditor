@@ -21,8 +21,54 @@ This document lists the properties, events, and exposed methods provided by the 
 | `fontFamily`             | `string`  | —       | Custom font family for the editor.                                                                         |
 | `codeFontFamily`         | `string`  | —       | Custom font family for code.                                                                               |
 | `fontSize`               | `number`  | —       | Font size in pixels.                                                                                       |
+| `renderHooks`            | `RenderHooks` | —   | Live-preview-only render hooks for synchronously transforming image URLs, exposing resolved link targets, and injecting custom classes, `data-*` attributes, and inline styles. |
 | `codeTheme`              | `'auto' \| CodeThemeName` | `'auto'` | Code block color scheme. `'auto'` follows editor theme. Options: `'one-dark'`, `'dracula'`, `'monokai'`, `'solarized-dark'`, `'nord'`, `'tokyo-night'`, `'github-light'`, `'solarized-light'`, `'atom-one-light'`. |
 | `codeLineNumbers`        | `boolean` | `false` | Whether to show line numbers in code blocks.                                                               |
+
+## `renderHooks`
+
+`renderHooks` provides a lightweight customization point during `livePreview` rendering. It never mutates the underlying Markdown source. Instead, it adjusts the rendered URL and DOM metadata for the currently visible content.
+
+### Image proxy example
+
+```ts
+const renderHooks = {
+  image: ({ src }) => ({
+    src: `https://img-proxy.example.com/?url=${encodeURIComponent(src)}`,
+    dataset: {
+      assetKind: 'proxy-image',
+    },
+    className: 'is-proxied-image',
+  }),
+};
+```
+
+### Link classification example
+
+```ts
+const renderHooks = {
+  link: ({ href }) => ({
+    href: href.startsWith('./') ? `/resolved${href}` : href,
+    dataset: {
+      linkKind: /^https?:\/\//.test(href) ? 'external' : 'internal',
+    },
+    className: /^https?:\/\//.test(href) ? 'is-external-link' : 'is-internal-link',
+  }),
+};
+```
+
+### Runtime semantics
+
+- Hooks are only invoked when `livePreview` is `true`.
+- Updating the `renderHooks` prop at runtime triggers a re-render of the visible region.
+- For links, the transformed target is exposed through a stable DOM attribute such as `data-href`; this reserved field cannot be overwritten by user-provided `dataset` values.
+- Hooks cannot change the visible link label, and the editor still falls back to raw Markdown source when the cursor enters a link or image.
+
+### Performance guidance
+
+- Hooks must stay synchronous, fast, and pure.
+- Do not perform network requests inside hooks.
+- If path resolution or classification is expensive in your app, cache those results outside the editor.
 
 ## Events
 

@@ -4,6 +4,15 @@ import { Prec, StateEffect, type Extension, type Range } from '@codemirror/state
 import type { DecorationSet, ViewUpdate } from '@codemirror/view';
 import { Vim } from '@replit/codemirror-vim';
 import { createStructuredTableExtensions, enterStructuredTableFromAdjacentText } from './structuredTable';
+import type {
+  ImageRenderContext,
+  ImageRenderResult,
+  LinkRenderContext,
+  LinkRenderResult,
+  RenderHookDataset,
+  RenderHookStyle,
+  RenderHooks,
+} from '../types/editor';
 
 // Effect dispatched after font CSS variables are updated, to signal
 // HybridMarkdownPlugin to rebuild decorations within a real transaction.
@@ -84,6 +93,27 @@ interface ListItemRenderData {
   kind: 'bullet' | 'ordered' | 'task';
   label: string;
   isChecked?: boolean;
+}
+
+interface ParsedImageData {
+  alt: string;
+  source: string;
+  title?: string;
+}
+
+interface ChildSyntaxNode {
+  name: string;
+  from: number;
+  to: number;
+  nextSibling: ChildSyntaxNode | null;
+}
+
+interface LinkSyntaxNodeRef {
+  from: number;
+  to: number;
+  node: {
+    firstChild: ChildSyntaxNode | null;
+  };
 }
 
 const HYBRID_SCOPE_NODES = new Set([
@@ -201,17 +231,28 @@ const linkDecoration = Decoration.mark({ class: 'cm-hybrid-link' });
 const inlineCodeDecoration = Decoration.mark({
   class: 'cm-una-code-font cm-hybrid-inline-code',
 });
+const LINK_RESERVED_DATA_KEYS = new Set(['href']);
+const LINK_TEXT_MARK_NAMES = new Set(['LinkMark', 'EmphasisMark', 'CodeMark']);
 
 class ImageWidget extends WidgetType {
   constructor(
     private readonly source: string,
     private readonly alt: string,
+    private readonly className?: string,
+    private readonly dataset?: RenderHookDataset,
+    private readonly style?: RenderHookStyle,
   ) {
     super();
   }
 
   eq(other: ImageWidget): boolean {
-    return this.source === other.source && this.alt === other.alt;
+    return (
+      this.source === other.source &&
+      this.alt === other.alt &&
+      this.className === other.className &&
+      sameStringRecord(this.dataset, other.dataset) &&
+      sameStringRecord(this.style, other.style)
+    );
   }
 
   toDOM(): HTMLElement {
@@ -224,6 +265,9 @@ class ImageWidget extends WidgetType {
     image.src = this.source;
     image.alt = this.alt;
     image.loading = 'lazy';
+    appendClassName(image, this.className);
+    applyDatasetAttributes(image, this.dataset);
+    applyInlineStyle(image, this.style);
 
     wrapper.appendChild(image);
     return wrapper;
@@ -276,38 +320,6 @@ class ListMarkerWidget extends WidgetType {
 
   ignoreEvent(): boolean {
     return false;
-  }
-}
-
-class HybridMarkdownPlugin {
-  decorations: DecorationSet;
-  private activeScopes: HybridScope[];
-
-  constructor(view: EditorView) {
-    this.activeScopes = getActiveScopes(view);
-    this.decorations = buildDecorations(view, this.activeScopes);
-  }
-
-  update(update: ViewUpdate): void {
-    const nextScopes = getActiveScopes(update.view);
-    const activeChanged = !sameScopes(this.activeScopes, nextScopes);
-    const hasRemeasure = update.transactions.some((tr) =>
-      tr.effects.some((e) => e.is(remeasureEffect)),
-    );
-
-    if (
-      update.docChanged ||
-      update.viewportChanged ||
-      update.focusChanged ||
-      activeChanged ||
-      hasRemeasure
-    ) {
-      this.activeScopes = nextScopes;
-      this.decorations = buildDecorations(update.view, nextScopes);
-      return;
-    }
-
-    this.activeScopes = nextScopes;
   }
 }
 
@@ -463,14 +475,17 @@ function addLineDecorations(
   }
 }
 
-function parseImage(nodeText: string): { alt: string; source: string } | null {
-  const match = nodeText.match(/^!\[(?<alt>[^\]]*)\]\((?<source>\S+?)(?:\s+["'][^"']*["'])?\)$/);
+function parseImage(nodeText: string): ParsedImageData | null {
+  const match = nodeText.match(
+    /^!\[(?<alt>[^\]]*)\]\((?<source>\S+?)(?:\s+(?<title>["'][^"']*["']))?\)$/,
+  );
 
   if (!match?.groups?.source) return null;
 
   return {
     alt: match.groups.alt ?? '',
     source: match.groups.source,
+    title: stripEnclosingQuotes(match.groups.title),
   };
 }
 
@@ -513,7 +528,11 @@ function getListItemRenderData(view: EditorView, node: { from: number; to: numbe
   };
 }
 
-function buildDecorations(view: EditorView, activeScopes: HybridScope[]): DecorationSet {
+function buildDecorations(
+  view: EditorView,
+  activeScopes: HybridScope[],
+  renderHooks?: RenderHooks,
+): DecorationSet {
   const decorations: Range<Decoration>[] = [];
 
   for (const range of getBufferedVisibleRanges(view)) {
@@ -541,9 +560,26 @@ function buildDecorations(view: EditorView, activeScopes: HybridScope[]): Decora
           const parsed = parseImage(view.state.doc.sliceString(node.from, node.to));
 
           if (parsed) {
+            const context: ImageRenderContext = {
+              src: parsed.source,
+              alt: parsed.alt,
+              title: parsed.title,
+              raw: view.state.doc.sliceString(node.from, node.to),
+              position: {
+                from: node.from,
+                to: node.to,
+              },
+            };
+            const imageResult = safeCallImageHook(context, renderHooks?.image);
             decorations.push(
               Decoration.replace({
-                widget: new ImageWidget(parsed.source, parsed.alt),
+                widget: new ImageWidget(
+                  imageResult.src,
+                  parsed.alt,
+                  imageResult.className,
+                  imageResult.dataset,
+                  imageResult.style,
+                ),
               }).range(node.from, node.to),
             );
           }
@@ -568,7 +604,14 @@ function buildDecorations(view: EditorView, activeScopes: HybridScope[]): Decora
         }
 
         if (node.name === 'Link') {
-          decorations.push(linkDecoration.range(node.from, node.to));
+          const linkContext = buildLinkRenderContext(view, node);
+          if (!renderHooks?.link || !linkContext) {
+            decorations.push(linkDecoration.range(node.from, node.to));
+            return;
+          }
+
+          const linkResult = safeCallLinkHook(linkContext, renderHooks.link);
+          decorations.push(buildLinkDecoration(linkResult).range(node.from, node.to));
           return;
         }
 
@@ -630,6 +673,270 @@ function buildDecorations(view: EditorView, activeScopes: HybridScope[]): Decora
   return Decoration.set(decorations, true);
 }
 
+/**
+ * Strip surrounding quote characters from a Markdown title literal.
+ */
+function stripEnclosingQuotes(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  if (value.length >= 2) {
+    const first = value[0];
+    const last = value[value.length - 1];
+    if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+      return value.slice(1, -1);
+    }
+  }
+  return value;
+}
+
+/**
+ * Normalize a dataset key to kebab-case without the `data-` prefix.
+ */
+function normalizeDataKey(key: string): string {
+  const withoutPrefix = key.startsWith('data-') ? key.slice(5) : key;
+  return withoutPrefix
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/[_\s]+/g, '-')
+    .toLowerCase();
+}
+
+/**
+ * Apply a user class list on top of the default element class.
+ */
+function appendClassName(element: HTMLElement, className?: string): void {
+  if (!className) return;
+
+  for (const token of className.split(/\s+/)) {
+    if (token) {
+      element.classList.add(token);
+    }
+  }
+}
+
+/**
+ * Apply dataset entries as `data-*` attributes.
+ */
+function applyDatasetAttributes(element: HTMLElement, dataset?: RenderHookDataset): void {
+  if (!dataset) return;
+
+  for (const [key, value] of Object.entries(dataset)) {
+    element.setAttribute(`data-${normalizeDataKey(key)}`, value);
+  }
+}
+
+/**
+ * Apply inline styles to a DOM element using CSS property names.
+ */
+function applyInlineStyle(element: HTMLElement, style?: RenderHookStyle): void {
+  if (!style) return;
+
+  for (const [property, value] of Object.entries(style)) {
+    element.style.setProperty(normalizeDataKey(property), value);
+  }
+}
+
+/**
+ * Compare two record-like objects by value.
+ */
+function sameStringRecord(
+  left?: Record<string, string>,
+  right?: Record<string, string>,
+): boolean {
+  if (left === right) return true;
+  if (!left || !right) return !left && !right;
+
+  const leftEntries = Object.entries(left).sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey));
+  const rightEntries = Object.entries(right).sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey));
+
+  if (leftEntries.length !== rightEntries.length) return false;
+
+  return leftEntries.every(
+    ([key, value], index) => key === rightEntries[index][0] && value === rightEntries[index][1],
+  );
+}
+
+/**
+ * Serialize an inline style object to an attribute-safe CSS string.
+ */
+function serializeInlineStyle(style?: RenderHookStyle): string | undefined {
+  if (!style) return undefined;
+
+  const serialized = Object.entries(style)
+    .map(([property, value]) => `${normalizeDataKey(property)}: ${value}`)
+    .join('; ');
+
+  return serialized || undefined;
+}
+
+/**
+ * Collect the visible label text inside a link by excluding Markdown marker nodes.
+ */
+function extractLinkLabelText(view: EditorView, from: number, to: number): string {
+  const hiddenRanges: Array<{ from: number; to: number }> = [];
+
+  syntaxTree(view.state).iterate({
+    from,
+    to,
+    enter(node) {
+      if (node.from < from || node.to > to) return;
+      if (LINK_TEXT_MARK_NAMES.has(node.name)) {
+        hiddenRanges.push({ from: node.from, to: node.to });
+      }
+    },
+  });
+
+  hiddenRanges.sort((left, right) => left.from - right.from || left.to - right.to);
+
+  let cursor = from;
+  let text = '';
+
+  for (const range of hiddenRanges) {
+    if (range.from > cursor) {
+      text += view.state.doc.sliceString(cursor, range.from);
+    }
+    cursor = Math.max(cursor, range.to);
+  }
+
+  if (cursor < to) {
+    text += view.state.doc.sliceString(cursor, to);
+  }
+
+  return text;
+}
+
+/**
+ * Build a link hook context from the Markdown syntax tree.
+ */
+function buildLinkRenderContext(
+  view: EditorView,
+  node: LinkSyntaxNodeRef,
+): LinkRenderContext | null {
+  let child: ChildSyntaxNode | null = node.node.firstChild;
+  let href: string | null = null;
+  let title: string | undefined;
+  let labelStart: number | null = null;
+  let labelEnd: number | null = null;
+
+  while (child) {
+    if (child.name === 'LinkMark') {
+      const text = view.state.doc.sliceString(child.from, child.to);
+      if (text === '[') {
+        labelStart = child.to;
+      } else if (text === ']') {
+        labelEnd = child.from;
+      }
+    } else if (child.name === 'URL') {
+      href = view.state.doc.sliceString(child.from, child.to);
+    } else if (child.name === 'LinkTitle') {
+      title = stripEnclosingQuotes(view.state.doc.sliceString(child.from, child.to));
+    }
+    child = child.nextSibling;
+  }
+
+  if (!href) return null;
+
+  const text =
+    labelStart != null && labelEnd != null && labelEnd >= labelStart
+      ? extractLinkLabelText(view, labelStart, labelEnd)
+      : '';
+
+  return {
+    href,
+    text,
+    title,
+    raw: view.state.doc.sliceString(node.from, node.to),
+    position: {
+      from: node.from,
+      to: node.to,
+    },
+  };
+}
+
+/**
+ * Call the image hook safely and fall back to the original context on failure.
+ */
+function safeCallImageHook(
+  context: ImageRenderContext,
+  hook?: RenderHooks['image'],
+): ImageRenderResult {
+  const fallback: ImageRenderResult = {
+    src: context.src,
+  };
+
+  if (!hook) return fallback;
+
+  try {
+    const result = hook(context);
+    if (!result) return fallback;
+
+    return {
+      src: result.src ?? context.src,
+      className: result.className,
+      dataset: result.dataset,
+      style: result.style,
+    };
+  } catch (error) {
+    console.warn('Image render hook failed.', error);
+    return fallback;
+  }
+}
+
+/**
+ * Call the link hook safely and fall back to the original context on failure.
+ */
+function safeCallLinkHook(
+  context: LinkRenderContext,
+  hook?: RenderHooks['link'],
+): LinkRenderResult {
+  const fallback: LinkRenderResult = {
+    href: context.href,
+  };
+
+  if (!hook) return fallback;
+
+  try {
+    const result = hook(context);
+    if (!result) return fallback;
+
+    return {
+      href: result.href ?? context.href,
+      className: result.className,
+      dataset: result.dataset,
+      style: result.style,
+    };
+  } catch (error) {
+    console.warn('Link render hook failed.', error);
+    return fallback;
+  }
+}
+
+/**
+ * Build an enhanced link mark decoration that preserves the existing text model.
+ */
+function buildLinkDecoration(result: LinkRenderResult): Decoration {
+  const attributes: Record<string, string> = {
+    'data-href': result.href,
+  };
+
+  for (const [key, value] of Object.entries(result.dataset ?? {})) {
+    const normalizedKey = normalizeDataKey(key);
+    if (LINK_RESERVED_DATA_KEYS.has(normalizedKey)) {
+      continue;
+    }
+    attributes[`data-${normalizedKey}`] = value;
+  }
+
+  const styleText = serializeInlineStyle(result.style);
+  if (styleText) {
+    attributes.style = styleText;
+  }
+
+  return Decoration.mark({
+    tagName: 'span',
+    class: ['cm-hybrid-link', result.className].filter(Boolean).join(' '),
+    attributes,
+  });
+}
+
 // Goal column tracker for vertical navigation in non-vim mode
 let goalColumn: number | null = null;
 
@@ -677,7 +984,46 @@ const goalColumnResetPlugin = ViewPlugin.fromClass(
   },
 );
 
-export function createLivePreviewExtensions(): Extension {
+function createHybridMarkdownViewPlugin(renderHooks?: RenderHooks): Extension {
+  return ViewPlugin.fromClass(
+    class {
+      decorations: DecorationSet;
+      private activeScopes: HybridScope[];
+
+      constructor(view: EditorView) {
+        this.activeScopes = getActiveScopes(view);
+        this.decorations = buildDecorations(view, this.activeScopes, renderHooks);
+      }
+
+      update(update: ViewUpdate): void {
+        const nextScopes = getActiveScopes(update.view);
+        const activeChanged = !sameScopes(this.activeScopes, nextScopes);
+        const hasRemeasure = update.transactions.some((tr) =>
+          tr.effects.some((e) => e.is(remeasureEffect)),
+        );
+
+        if (
+          update.docChanged ||
+          update.viewportChanged ||
+          update.focusChanged ||
+          activeChanged ||
+          hasRemeasure
+        ) {
+          this.activeScopes = nextScopes;
+          this.decorations = buildDecorations(update.view, nextScopes, renderHooks);
+          return;
+        }
+
+        this.activeScopes = nextScopes;
+      }
+    },
+    {
+      decorations: (value) => value.decorations,
+    },
+  );
+}
+
+export function createLivePreviewExtensions(renderHooks?: RenderHooks): Extension {
   return [
     HYBRID_THEME,
     createStructuredTableExtensions(),
@@ -688,9 +1034,7 @@ export function createLivePreviewExtensions(): Extension {
         { key: 'ArrowUp', run: (view) => moveByLogicalLine(view, -1) },
       ]),
     ),
-    ViewPlugin.fromClass(HybridMarkdownPlugin, {
-      decorations: (value) => value.decorations,
-    }),
+    createHybridMarkdownViewPlugin(renderHooks),
   ];
 }
 

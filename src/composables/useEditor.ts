@@ -169,7 +169,7 @@ export function useEditor(
       ),
 
       // Optional hybrid markdown rendering layer
-      hybridCompartment.of(props.livePreview ? createLivePreviewExtensions() : []),
+      hybridCompartment.of(props.livePreview ? createLivePreviewExtensions(props.renderHooks) : []),
 
       // Code font decoration for non-livePreview mode (dynamic)
       codeDecorationCompartment.of(props.livePreview ? [] : createCodeDecorationExtension()),
@@ -314,12 +314,12 @@ export function useEditor(
 
   // Watch hybridMarkdown prop and update dynamically
   watch(
-    () => props.livePreview,
-    (enabled) => {
+    () => [props.livePreview, props.renderHooks] as const,
+    ([enabled, renderHooks]) => {
       if (!editorView.value) return;
       editorView.value.dispatch({
         effects: [
-          hybridCompartment.reconfigure(enabled ? createLivePreviewExtensions() : []),
+          hybridCompartment.reconfigure(enabled ? createLivePreviewExtensions(renderHooks) : []),
           codeDecorationCompartment.reconfigure(enabled ? [] : createCodeDecorationExtension()),
         ],
       });

@@ -9,6 +9,11 @@ export type {
   EditorProps,
   EditorEvents,
   EditorExposed,
+  ImageRenderContext,
+  ImageRenderResult,
+  LinkRenderContext,
+  LinkRenderResult,
+  RenderHooks,
   CustomLocale,
   Locale,
 } from './types/editor';

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { UnaEditor } from 'una-editor';
+import { UnaEditor, type RenderHooks } from 'una-editor';
 
 const { t } = useI18n();
 
@@ -22,6 +22,34 @@ const codeTheme = ref<DemoCodeTheme>('auto');
 const wrapperClass = computed(() =>
   editorTheme.value === 'light' ? 'editor-wrapper-light' : 'editor-wrapper-dark',
 );
+const demoRenderHooks = computed<RenderHooks>(() => ({
+  image: ({ src }) => ({
+    src: src.includes('?') ? `${src}&demo-proxy=1` : `${src}?demo-proxy=1`,
+    className: 'demo-render-hook-image',
+    dataset: {
+      assetKind: 'proxy-image',
+    },
+    style: {
+      boxShadow:
+        editorTheme.value === 'dark'
+          ? '0 0 0 2px rgba(56, 189, 248, 0.35)'
+          : '0 0 0 2px rgba(14, 165, 233, 0.2)',
+    },
+  }),
+  link: ({ href }) => {
+    const isExternal = /^https?:\/\//.test(href);
+    return {
+      href: isExternal ? href : `/resolved${href}`,
+      className: isExternal ? 'demo-render-hook-link-external' : 'demo-render-hook-link-internal',
+      dataset: {
+        linkKind: isExternal ? 'external' : 'internal',
+      },
+      style: {
+        textDecorationColor: isExternal ? '#38bdf8' : '#fb923c',
+      },
+    };
+  },
+}));
 
 const editorThemeOptions = computed(() => [
   { label: t('demo.controls.light'), value: 'light' },
@@ -62,7 +90,17 @@ This editor renders **bold**, *italic*, and ***bold italic*** text in place whil
 - [ ] Task lists render as clean checkboxes
 - [x] Checked tasks still fall back to Markdown source when you edit them
 
-> Blockquotes, links like [CodeMirror](https://codemirror.net/), and inline code such as \`const count = ref(0)\` are all part of the same editing surface.
+> Blockquotes, links like [CodeMirror](https://codemirror.net/), internal links like [API Docs](./docs/api.md), and inline code such as \`const count = ref(0)\` are all part of the same editing surface.
+
+### Render Hooks Demo
+
+The playground enables demo \`renderHooks\`:
+
+- external links get a different underline color and \`data-link-kind="external"\`
+- relative links are exposed as resolved targets in \`data-href\`
+- images get a demo proxy query and \`data-asset-kind="proxy-image"\`
+
+![Render Hook Asset](https://placehold.co/320x120/0f172a/e2e8f0?text=Render+Hook)
 
 ### Structured Table Preview
 
@@ -126,6 +164,7 @@ print(fibonacci(10))
         <UnaEditor
           v-model="demoContent"
           live-preview
+          :render-hooks="demoRenderHooks"
           :theme="editorTheme"
           :code-theme="codeTheme"
         />
@@ -231,5 +270,13 @@ print(fibonacci(10))
 
 .editor-wrapper-light :deep(.cm-gutters) {
   color: #64748b;
+}
+
+.editor-wrapper :deep(.demo-render-hook-link-external) {
+  text-decoration-thickness: 2px;
+}
+
+.editor-wrapper :deep(.demo-render-hook-link-internal) {
+  text-decoration-thickness: 2px;
 }
 </style>

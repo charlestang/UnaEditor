@@ -21,8 +21,54 @@
 | `fontFamily`             | `string`  | —       | 自定义编辑器字体族。                                                     |
 | `codeFontFamily`         | `string`  | —       | 自定义代码字体族。                                                       |
 | `fontSize`               | `number`  | —       | 字体大小（px）。                                                         |
+| `renderHooks`            | `RenderHooks` | —   | 仅在 `livePreview` 下生效的渲染钩子，可同步改写图片地址、暴露链接目标，并注入自定义 `class`、`data-*` 属性和行内样式。 |
 | `codeTheme`              | `'auto' \| CodeThemeName` | `'auto'` | 代码块配色方案。`'auto'` 自动跟随编辑器主题。可选值：`'one-dark'`、`'dracula'`、`'monokai'`、`'solarized-dark'`、`'nord'`、`'tokyo-night'`、`'github-light'`、`'solarized-light'`、`'atom-one-light'`。 |
 | `codeLineNumbers`        | `boolean` | `false` | 是否在代码块中显示行号。                                                 |
+
+## `renderHooks`
+
+`renderHooks` 用于在 `livePreview` 渲染阶段对图片和链接做轻量定制。它是同步 API，不会修改底层 Markdown 文本，只影响当前可见的渲染结果和 DOM 元数据。
+
+### 图片代理示例
+
+```ts
+const renderHooks = {
+  image: ({ src }) => ({
+    src: `https://img-proxy.example.com/?url=${encodeURIComponent(src)}`,
+    dataset: {
+      assetKind: 'proxy-image',
+    },
+    className: 'is-proxied-image',
+  }),
+};
+```
+
+### 链接分类示例
+
+```ts
+const renderHooks = {
+  link: ({ href }) => ({
+    href: href.startsWith('./') ? `/resolved${href}` : href,
+    dataset: {
+      linkKind: /^https?:\/\//.test(href) ? 'external' : 'internal',
+    },
+    className: /^https?:\/\//.test(href) ? 'is-external-link' : 'is-internal-link',
+  }),
+};
+```
+
+### 运行时语义
+
+- `renderHooks` 只在 `livePreview` 为 `true` 时调用。
+- 当 `renderHooks` prop 在组件运行时发生变化，编辑器会重新渲染可见区域。
+- 对链接而言，变换后的目标地址会通过稳定的 DOM 属性暴露，例如 `data-href`；该系统保留字段不会被用户自定义 `dataset` 覆盖。
+- hooks 不能修改链接的可见文本；当光标进入图片或链接时，编辑器仍会回退到原始 Markdown 源码态。
+
+### 性能建议
+
+- hooks 必须是同步、快速、纯函数。
+- 不要在 hooks 中发起网络请求。
+- 如果你的路径解析或分类逻辑本身较重，应在业务层自行缓存结果。
 
 ## 事件 (Events)
 

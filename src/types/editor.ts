@@ -1,5 +1,27 @@
 import type { EditorView } from '@codemirror/view';
 
+/**
+ * Shared document position for render hook contexts.
+ */
+export interface RenderHookPosition {
+  from: number;
+  to: number;
+}
+
+/**
+ * Inline style object accepted by render hooks.
+ */
+export interface RenderHookStyle {
+  [property: string]: string;
+}
+
+/**
+ * Dataset object accepted by render hooks.
+ */
+export interface RenderHookDataset {
+  [key: string]: string;
+}
+
 // Code theme names
 export type CodeThemeName =
   // Dark themes
@@ -44,12 +66,63 @@ export interface CodeTheme {
   colors: CodeThemeColors;
 }
 
+/**
+ * Context passed to image render hooks.
+ */
+export interface ImageRenderContext {
+  src: string;
+  alt: string;
+  title?: string;
+  raw: string;
+  position: RenderHookPosition;
+}
+
+/**
+ * Partial render result returned from image render hooks.
+ */
+export interface ImageRenderResult {
+  src: string;
+  className?: string;
+  dataset?: RenderHookDataset;
+  style?: RenderHookStyle;
+}
+
+/**
+ * Context passed to link render hooks.
+ */
+export interface LinkRenderContext {
+  href: string;
+  text: string;
+  title?: string;
+  raw: string;
+  position: RenderHookPosition;
+}
+
+/**
+ * Partial render result returned from link render hooks.
+ */
+export interface LinkRenderResult {
+  href: string;
+  className?: string;
+  dataset?: RenderHookDataset;
+  style?: RenderHookStyle;
+}
+
+/**
+ * Optional render-time hooks for live preview elements.
+ */
+export interface RenderHooks {
+  image?: (context: ImageRenderContext) => Partial<ImageRenderResult> | void;
+  link?: (context: LinkRenderContext) => Partial<LinkRenderResult> | void;
+}
+
 // Editor component props
 export interface EditorProps {
   modelValue: string;
   lineNumbers?: boolean;
   lineWrap?: boolean;
   livePreview?: boolean;
+  renderHooks?: RenderHooks;
   vimMode?: boolean;
   locale?: string | CustomLocale;
   placeholder?: string;
