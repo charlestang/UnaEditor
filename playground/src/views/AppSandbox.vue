@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { getCM } from '@replit/codemirror-vim';
+import { computed, ref } from 'vue';
 import { UnaEditor, version } from 'una-editor';
-import type { EditorExposed } from 'una-editor';
+import type { EditorExposed, EditorTheme } from 'una-editor';
 
 // Editor state
 const content = ref(
-  '# Hello UnaEditor\n\n这是一个基于 CodeMirror 6 的 Markdown 编辑器。\n\n## 功能特性\n\n- 支持 v-model 双向绑定\n- 支持行号显示\n- 支持 Hybrid Markdown 渲染\n- 支持国际化（中英文）\n- 支持亮色/暗色主题\n- 支持全屏模式\n- 支持图片拖拽和粘贴\n- 支持 Mod-s 保存快捷键\n\n### 列表预览\n\n- 无序列表会以更接近阅读态的 bullet 显示\n* `*` 和 `+` 这类标准 marker 也支持\n+ 混合和嵌套列表可以继续编辑\n1. 有序列表支持 `.` 分隔符\n2) 也支持 `)` 分隔符\n\n- [ ] Task list 会显示为只读 checkbox\n- [x] 点击 checkbox 不会直接切换状态，仍然通过源码编辑\n\n> 这是一段 blockquote，用来演示首期的保守增强效果。\n\n`inline code`、**bold**、*italic* 和 [link](https://codemirror.net/) 都可以在 hybrid 模式下看到更接近渲染态的显示。\n\n![UnaEditor Demo](https://placehold.co/320x160/orange/white?text=UnaEditor)\n\n```ts\nfunction greet(name: string) {\n  return `Hello, ${name}`;\n}\n```\n\n## 表格结构化编辑\n\n| feature | status | notes |\n| :--- | :---: | ---: |\n| navigation | ready | 方向键、Enter、Tab |\n| multiline | rendered | 第一行<br>第二行<br/>第三行 |\n| source fallback | stable | 关闭 Live Preview 或写出不完整表格即可回源码 |\n| image | ![demo](https://placehold.co/120x72/0f172a/ffffff?text=Cell) | 图片也会在非活动 cell 渲染 |\n\n| action | shortcut | result |\n| --- | --- | --- |\n| move down | Enter | 最后一行会自动补新行 |\n| move up | Shift+Enter | 首行保持不动 |\n| paste | text/plain | 多行纯文本会转成 `<br>` |\n| vim | `j/k/h/l` | normal / insert 都可继续验证 |\n\n### 源码兜底样例\n\n下面这段故意损坏了一行列数，应该保持源码态，不进入结构化表格：\n\n| broken | table | sample |\n| --- | --- | --- |\n| only two cells | fallback |\n\n试试点击单元格编辑、右键 `:::` handle、点击边缘 `+` handle、切换 Vim normal / insert，或者观察这段损坏表格的源码兜底行为。',
+  '# Hello UnaEditor\n\n这是一个基于 CodeMirror 6 的 Markdown 编辑器。\n\n## 功能特性\n\n- 支持 v-model 双向绑定\n- 支持行号显示\n- 支持 Hybrid Markdown 渲染\n- 支持国际化（中英文）\n- 支持亮色/暗色主题\n- 支持全屏模式\n- 支持图片拖拽和粘贴\n- 支持 Mod-s 保存快捷键\n\n### 列表预览\n\n- 无序列表会以更接近阅读态的 bullet 显示\n* `*` 和 `+` 这类标准 marker 也支持\n+ 混合和嵌套列表可以继续编辑\n1. 有序列表支持 `.` 分隔符\n2) 也支持 `)` 分隔符\n\n- [ ] Task list 会显示为只读 checkbox\n- [x] 点击 checkbox 不会直接切换状态，仍然通过源码编辑\n\n> 这是一段 blockquote，用来演示首期的保守增强效果。\n\n`inline code`、**bold**、*italic* 和 [link](https://codemirror.net/) 都可以在 hybrid 模式下看到更接近渲染态的显示。\n\n![UnaEditor Demo](https://placehold.co/320x160/orange/white?text=UnaEditor)\n\n## Obsidian-like Code Fence\n\n下面三段代码块适合一起验证：移入光标时 fence 源码恢复、移出时 header row 回来、右上角 copy icon 是否稳定、以及 faux gutter 的观感。\n\n```ts\nfunction greet(name: string) {\n  return `Hello, ${name}`;\n}\n```\n\n```\nPlain fence without a language label.\nSecond line stays copyable without fence markers.\n```\n\n```unknown-lang\nconst veryLongValue = \"This code fence intentionally keeps a long single line so you can toggle lineWrap and inspect whether wrapped lines still align to the code column instead of collapsing back under the faux gutter.\";\n```\n\n## 表格结构化编辑\n\n| feature | status | notes |\n| :--- | :---: | ---: |\n| navigation | ready | 方向键、Enter、Tab |\n| multiline | rendered | 第一行<br>第二行<br/>第三行 |\n| source fallback | stable | 关闭 Live Preview 或写出不完整表格即可回源码 |\n| image | ![demo](https://placehold.co/120x72/0f172a/ffffff?text=Cell) | 图片也会在非活动 cell 渲染 |\n\n| action | shortcut | result |\n| --- | --- | --- |\n| move down | Enter | 最后一行会自动补新行 |\n| move up | Shift+Enter | 首行保持不动 |\n| paste | text/plain | 多行纯文本会转成 `<br>` |\n| vim | `j/k/h/l` | normal / insert 都可继续验证 |\n\n### 源码兜底样例\n\n下面这段故意损坏了一行列数，应该保持源码态，不进入结构化表格：\n\n| broken | table | sample |\n| --- | --- | --- |\n| only two cells | fallback |\n\n试试点击单元格编辑、右键 `:::` handle、点击边缘 `+` handle、切换 Vim normal / insert，或者观察这段损坏表格的源码兜底行为。',
 );
 
 // Editor options
@@ -15,12 +14,43 @@ const lineWrap = ref(true);
 const livePreview = ref(true);
 const vimMode = ref(false);
 const locale = ref<'zh-CN' | 'en-US'>('zh-CN');
-const theme = ref<'light' | 'dark'>('light');
+const themeMode = ref<'light' | 'dark' | 'custom-dark'>('light');
 const fontSize = ref<number | undefined>(undefined);
 const fontFamily = ref<string | undefined>(undefined);
 const codeFontFamily = ref<string | undefined>(undefined);
-const codeTheme = ref<'auto' | 'one-dark' | 'dracula' | 'monokai' | 'solarized-dark' | 'solarized-light' | 'nord' | 'tokyo-night' | 'github-light' | 'atom-one-light'>('auto');
+const codeTheme = ref<
+  | 'auto'
+  | 'one-dark'
+  | 'dracula'
+  | 'monokai'
+  | 'solarized-dark'
+  | 'solarized-light'
+  | 'nord'
+  | 'tokyo-night'
+  | 'github-light'
+  | 'atom-one-light'
+>('auto');
 const codeLineNumbers = ref(false);
+
+const customDarkTheme: EditorTheme = {
+  name: 'Custom Dark',
+  type: 'dark',
+  content: {
+    link: {
+      color: '#f59e0b',
+    },
+    inlineCode: {
+      backgroundColor: 'rgba(245, 158, 11, 0.14)',
+    },
+  },
+  table: {
+    headerBackground: 'rgba(245, 158, 11, 0.12)',
+  },
+};
+
+const theme = computed(() => {
+  return themeMode.value === 'custom-dark' ? customDarkTheme : themeMode.value;
+});
 
 // Editor ref
 const editorRef = ref<EditorExposed>();
@@ -71,7 +101,9 @@ const runEditorHistory = (kind: 'undo' | 'redo') => {
   if (!view) return;
 
   const isMac = /Mac|iPhone|iPad|iPod/i.test(window.navigator.platform);
-  const overlay = view.dom.querySelector<HTMLTextAreaElement>('.cm-structured-table-overlay-visible');
+  const overlay = view.dom.querySelector<HTMLTextAreaElement>(
+    '.cm-structured-table-overlay-visible',
+  );
   const target = overlay ?? view.contentDOM;
   const key = kind === 'redo' && !isMac ? 'y' : 'z';
   const withShift = kind === 'redo' && isMac;
@@ -199,9 +231,10 @@ const contentWithLineNumbers = () =>
 
       <div class="control-group">
         <label>主题：</label>
-        <select v-model="theme">
+        <select v-model="themeMode">
           <option value="light">亮色</option>
           <option value="dark">暗色</option>
+          <option value="custom-dark">自定义暗色</option>
         </select>
       </div>
 

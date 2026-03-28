@@ -126,17 +126,23 @@ The Editor component SHALL expose methods for programmatic control.
 
 ### Requirement: Theme support
 
-The Editor component SHALL support light and dark themes.
+The Editor component SHALL support light and dark preset themes, and SHALL also support custom theme override objects.
 
-#### Scenario: Light theme
+#### Scenario: Light preset theme
 
-- **WHEN** theme prop is set to 'light' or undefined
-- **THEN** the editor SHALL display with light theme colors
+- **WHEN** `theme` prop is set to `'light'` or omitted
+- **THEN** the editor SHALL display with the light preset theme
 
-#### Scenario: Dark theme
+#### Scenario: Dark preset theme
 
-- **WHEN** theme prop is set to 'dark'
-- **THEN** the editor SHALL display with dark theme colors
+- **WHEN** `theme` prop is set to `'dark'`
+- **THEN** the editor SHALL display with the dark preset theme
+
+#### Scenario: Custom theme override object
+
+- **WHEN** `theme` prop is set to a custom theme object with `type: 'dark'`
+- **THEN** the editor SHALL resolve it against the dark preset theme
+- **AND** the editor SHALL apply the resolved result without recreating the editor instance
 
 ### Requirement: Editor state control
 

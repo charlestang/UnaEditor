@@ -3,8 +3,12 @@ import { syntaxTree } from '@codemirror/language';
 import { Prec, StateEffect, type Extension, type Range } from '@codemirror/state';
 import type { DecorationSet, ViewUpdate } from '@codemirror/view';
 import { Vim } from '@replit/codemirror-vim';
-import { createStructuredTableExtensions, enterStructuredTableFromAdjacentText } from './structuredTable';
+import {
+  createStructuredTableExtensions,
+  enterStructuredTableFromAdjacentText,
+} from './structuredTable';
 import type {
+  EditorThemeContent,
   ImageRenderContext,
   ImageRenderResult,
   LinkRenderContext,
@@ -35,10 +39,7 @@ export function setupVimLogicalNavigation() {
       const count = motionArgs.repeat || 1;
       const headIndex = cm.indexFromPos(head);
 
-      if (
-        count === 1 &&
-        enterStructuredTableFromAdjacentText(view, direction, false, headIndex)
-      ) {
+      if (count === 1 && enterStructuredTableFromAdjacentText(view, direction, false, headIndex)) {
         return cm.posFromIndex(view.state.selection.main.head);
       }
 
@@ -134,57 +135,56 @@ const HYBRID_SCOPE_NODES = new Set([
   // Note: FencedCode removed - handled by independent code block decorator plugin
 ]);
 
-const HYBRID_THEME = EditorView.theme({
-  '.cm-una-code-font': {
+function isHeadingNode(name: string): boolean {
+  return name.startsWith('ATXHeading') || name.startsWith('SetextHeading');
+}
+
+function createHeadingStyles(content: EditorThemeContent) {
+  const headingEntries = [
+    ['1', content.heading1],
+    ['2', content.heading2],
+    ['3', content.heading3],
+    ['4', content.heading4],
+    ['5', content.heading5],
+    ['6', content.heading6],
+  ] as const;
+
+  return headingEntries.reduce<Record<string, Record<string, string>>>((styles, [level, value]) => {
+    styles[`.cm-line.cm-heading-line-${level}`] = {
+      lineHeight: value.lineHeight,
+    };
+    styles[`.cm-heading-line-${level} .tok-heading`] = {
+      fontSize: value.fontSize,
+      fontWeight: value.fontWeight,
+      lineHeight: value.lineHeight,
+    };
+    styles[`.cm-heading-line-${level} .tok-meta`] = {
+      color: content.syntaxMark.color,
+    };
+
+    return styles;
+  }, {});
+}
+
+function createOwnedTextStyles(
+  selector: string,
+  styles: Record<string, string>,
+): Record<string, Record<string, string>> {
+  return {
+    [selector]: styles,
+    [`${selector} span`]: { ...styles },
+  };
+}
+
+export const HYBRID_BASE_THEME = EditorView.theme({
+  ...createOwnedTextStyles('.cm-una-code-font', {
     fontFamily: 'var(--una-code-font-family, ui-monospace, SFMono-Regular, Menlo, monospace)',
-  },
-  '.cm-hybrid-heading-1': {
-    fontSize: '1.875em',
-    fontWeight: '700',
-    lineHeight: '1.25',
-  },
-  '.cm-hybrid-heading-2': {
-    fontSize: '1.5em',
-    fontWeight: '700',
-    lineHeight: '1.3',
-  },
-  '.cm-hybrid-heading-3': {
-    fontSize: '1.25em',
-    fontWeight: '700',
-    lineHeight: '1.35',
-  },
-  '.cm-hybrid-heading-4, .cm-hybrid-heading-5, .cm-hybrid-heading-6': {
-    fontWeight: '700',
-    lineHeight: '1.4',
-  },
-  '.cm-hybrid-emphasis': {
-    fontStyle: 'italic',
-  },
-  '.cm-hybrid-strong': {
-    fontWeight: '700',
-  },
-  '.cm-hybrid-link': {
-    color: '#0b57d0',
-    textDecoration: 'underline',
-    textUnderlineOffset: '0.18em',
-  },
-  '.cm-hybrid-inline-code': {
-    backgroundColor: 'rgba(15, 23, 42, 0.08)',
-    borderRadius: '4px',
-    padding: '0.1em 0.3em',
-  },
-  '.cm-line.cm-hybrid-blockquote-line': {
-    borderLeft: '3px solid rgba(100, 116, 139, 0.5)',
-    backgroundColor: 'rgba(148, 163, 184, 0.08)',
-    paddingLeft: '0.75rem',
-    fontStyle: 'italic',
-  },
+  }),
   '.cm-hybrid-list-marker': {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: '0.22em',
-    color: 'rgba(100, 116, 139, 0.9)',
     userSelect: 'none',
     verticalAlign: 'baseline',
   },
@@ -199,7 +199,6 @@ const HYBRID_THEME = EditorView.theme({
     width: '0.95em',
     height: '0.95em',
     margin: '0',
-    accentColor: '#14b8a6',
     pointerEvents: 'none',
     flex: '0 0 auto',
     position: 'relative',
@@ -210,6 +209,12 @@ const HYBRID_THEME = EditorView.theme({
     alignItems: 'center',
     maxWidth: '100%',
     verticalAlign: 'middle',
+  },
+  '.cm-hybrid-image-inline-preview': {
+    display: 'block',
+    width: 'fit-content',
+    maxWidth: '100%',
+    paddingTop: '0.35rem',
   },
   '.cm-hybrid-image-element': {
     display: 'block',
@@ -222,7 +227,58 @@ const HYBRID_THEME = EditorView.theme({
   '&.cm-focused .cm-hybrid-image-element': {
     outline: 'none',
   },
+  '.cm-hybrid-image-status': {
+    display: 'none',
+    padding: '0.4rem 0.55rem',
+    borderRadius: '8px',
+    border: '1px solid rgba(148, 163, 184, 0.35)',
+    backgroundColor: 'rgba(148, 163, 184, 0.08)',
+    color: '#64748b',
+    fontSize: '0.875em',
+    lineHeight: '1.35',
+  },
+  '.cm-hybrid-image-broken .cm-hybrid-image-element': {
+    display: 'none',
+  },
+  '.cm-hybrid-image-broken .cm-hybrid-image-status': {
+    display: 'inline-flex',
+    alignItems: 'center',
+  },
 });
+
+export function createContentTheme(content: EditorThemeContent): Extension {
+  return EditorView.theme({
+    ...createHeadingStyles(content),
+    ...createOwnedTextStyles('.cm-hybrid-emphasis', {
+      fontStyle: content.emphasis.fontStyle,
+    }),
+    ...createOwnedTextStyles('.cm-hybrid-strong', {
+      fontWeight: content.strong.fontWeight,
+    }),
+    ...createOwnedTextStyles('.cm-hybrid-link', {
+      color: content.link.color,
+      textDecoration: content.link.textDecoration,
+      textUnderlineOffset: content.link.textUnderlineOffset,
+    }),
+    '.cm-hybrid-inline-code': {
+      backgroundColor: content.inlineCode.backgroundColor,
+      borderRadius: content.inlineCode.borderRadius,
+      padding: content.inlineCode.padding,
+    },
+    '.cm-line.cm-hybrid-blockquote-line': {
+      borderLeft: `3px solid ${content.blockquote.borderColor}`,
+      backgroundColor: content.blockquote.backgroundColor,
+      paddingLeft: content.blockquote.paddingLeft,
+      fontStyle: content.blockquote.fontStyle,
+    },
+    '.cm-hybrid-list-marker': {
+      color: content.listMarker.color,
+    },
+    '.cm-hybrid-task-checkbox': {
+      accentColor: content.taskCheckbox.accentColor,
+    },
+  });
+}
 
 const hiddenDecoration = Decoration.replace({});
 const emphasisDecoration = Decoration.mark({ class: 'cm-hybrid-emphasis' });
@@ -238,6 +294,7 @@ class ImageWidget extends WidgetType {
   constructor(
     private readonly source: string,
     private readonly alt: string,
+    private readonly mode: 'replace' | 'inline-preview',
     private readonly className?: string,
     private readonly dataset?: RenderHookDataset,
     private readonly style?: RenderHookStyle,
@@ -249,6 +306,7 @@ class ImageWidget extends WidgetType {
     return (
       this.source === other.source &&
       this.alt === other.alt &&
+      this.mode === other.mode &&
       this.className === other.className &&
       sameStringRecord(this.dataset, other.dataset) &&
       sameStringRecord(this.style, other.style)
@@ -258,6 +316,9 @@ class ImageWidget extends WidgetType {
   toDOM(): HTMLElement {
     const wrapper = document.createElement('span');
     wrapper.className = 'cm-hybrid-image';
+    if (this.mode === 'inline-preview') {
+      wrapper.classList.add('cm-hybrid-image-inline-preview');
+    }
     wrapper.contentEditable = 'false';
 
     const image = document.createElement('img');
@@ -269,7 +330,22 @@ class ImageWidget extends WidgetType {
     applyDatasetAttributes(image, this.dataset);
     applyInlineStyle(image, this.style);
 
+    const status = document.createElement('span');
+    status.className = 'cm-hybrid-image-status';
+    status.textContent = '图片无法获取';
+    status.setAttribute('aria-live', 'polite');
+
+    image.addEventListener('error', () => {
+      wrapper.classList.add('cm-hybrid-image-broken');
+      status.textContent = this.source ? '图片地址错误或无法获取' : '图片无法获取';
+    });
+
+    image.addEventListener('load', () => {
+      wrapper.classList.remove('cm-hybrid-image-broken');
+    });
+
     wrapper.appendChild(image);
+    wrapper.appendChild(status);
     return wrapper;
   }
 
@@ -332,7 +408,11 @@ function addNearestListItemScope(
   let current = node;
 
   while (current) {
-    if (current.name === 'ListItem' && current.from <= selection.from && current.to >= selection.to) {
+    if (
+      current.name === 'ListItem' &&
+      current.from <= selection.from &&
+      current.to >= selection.to
+    ) {
       const key = `${current.name}:${current.from}:${current.to}`;
 
       if (!seen.has(key)) {
@@ -459,6 +539,16 @@ function getHeadingDecoration(name: string): Decoration | null {
   return Decoration.mark({ class: `cm-hybrid-heading-${level}` });
 }
 
+function getHeadingLineDecoration(name: string): Decoration | null {
+  const level = name.startsWith('ATXHeading')
+    ? name.slice('ATXHeading'.length)
+    : name.slice('SetextHeading'.length);
+
+  if (!level) return null;
+
+  return Decoration.line({ class: `cm-heading-line-${level}` });
+}
+
 function addLineDecorations(
   decorations: Array<ReturnType<typeof hiddenDecoration.range>>,
   view: EditorView,
@@ -489,7 +579,10 @@ function parseImage(nodeText: string): ParsedImageData | null {
   };
 }
 
-function getListItemRenderData(view: EditorView, node: { from: number; to: number }): ListItemRenderData | null {
+function getListItemRenderData(
+  view: EditorView,
+  node: { from: number; to: number },
+): ListItemRenderData | null {
   const line = view.state.doc.lineAt(node.from);
   const lineText = view.state.doc.sliceString(node.from, line.to);
   const markerMatch = lineText.match(/^(?<marker>(?:[-+*])|(?:\d+[.)]))(?<spacing>[ \t]+)/);
@@ -540,20 +633,40 @@ function buildDecorations(
       from: range.from,
       to: range.to,
       enter(node) {
-        if (isInActiveScope(node, activeScopes)) return;
+        const isActive = isInActiveScope(node, activeScopes);
 
-        if (node.name === 'ListItem') {
-          const renderData = getListItemRenderData(view, node);
-
-          if (renderData) {
-            decorations.push(
-              Decoration.replace({
-                widget: new ListMarkerWidget(renderData),
-              }).range(renderData.from, renderData.to),
-            );
+        if (isHeadingNode(node.name)) {
+          const lineDecoration = getHeadingLineDecoration(node.name);
+          if (lineDecoration) {
+            decorations.push(lineDecoration.range(view.state.doc.lineAt(node.from).from));
           }
+        }
 
+        if (node.name === 'Emphasis') {
+          decorations.push(emphasisDecoration.range(node.from, node.to));
+          if (isActive) return;
+        }
+
+        if (node.name === 'StrongEmphasis') {
+          decorations.push(strongDecoration.range(node.from, node.to));
+          if (isActive) return;
+        }
+
+        if (node.name === 'Link') {
+          const linkContext = buildLinkRenderContext(view, node);
+          if (!renderHooks?.link || !linkContext) {
+            decorations.push(linkDecoration.range(node.from, node.to));
+          } else {
+            const linkResult = safeCallLinkHook(linkContext, renderHooks.link);
+            decorations.push(buildLinkDecoration(linkResult).range(node.from, node.to));
+          }
+          if (isActive) return;
           return;
+        }
+
+        if (node.name === 'InlineCode') {
+          decorations.push(inlineCodeDecoration.range(node.from, node.to));
+          if (isActive) return;
         }
 
         if (node.name === 'Image') {
@@ -571,52 +684,59 @@ function buildDecorations(
               },
             };
             const imageResult = safeCallImageHook(context, renderHooks?.image);
-            decorations.push(
-              Decoration.replace({
-                widget: new ImageWidget(
-                  imageResult.src,
-                  parsed.alt,
-                  imageResult.className,
-                  imageResult.dataset,
-                  imageResult.style,
-                ),
-              }).range(node.from, node.to),
-            );
+
+            if (isActive) {
+              decorations.push(
+                Decoration.widget({
+                  widget: new ImageWidget(
+                    imageResult.src,
+                    parsed.alt,
+                    'inline-preview',
+                    imageResult.className,
+                    imageResult.dataset,
+                    imageResult.style,
+                  ),
+                  side: 1,
+                }).range(node.to),
+              );
+            } else {
+              decorations.push(
+                Decoration.replace({
+                  widget: new ImageWidget(
+                    imageResult.src,
+                    parsed.alt,
+                    'replace',
+                    imageResult.className,
+                    imageResult.dataset,
+                    imageResult.style,
+                  ),
+                }).range(node.from, node.to),
+              );
+            }
           }
 
           return false;
         }
 
-        if (node.name.startsWith('ATXHeading') || node.name.startsWith('SetextHeading')) {
-          const decoration = getHeadingDecoration(node.name);
-          if (decoration) decorations.push(decoration.range(node.from, node.to));
-          return;
-        }
+        if (isActive) return;
 
-        if (node.name === 'Emphasis') {
-          decorations.push(emphasisDecoration.range(node.from, node.to));
-          return;
-        }
+        if (node.name === 'ListItem') {
+          const renderData = getListItemRenderData(view, node);
 
-        if (node.name === 'StrongEmphasis') {
-          decorations.push(strongDecoration.range(node.from, node.to));
-          return;
-        }
-
-        if (node.name === 'Link') {
-          const linkContext = buildLinkRenderContext(view, node);
-          if (!renderHooks?.link || !linkContext) {
-            decorations.push(linkDecoration.range(node.from, node.to));
-            return;
+          if (renderData) {
+            decorations.push(
+              Decoration.replace({
+                widget: new ListMarkerWidget(renderData),
+              }).range(renderData.from, renderData.to),
+            );
           }
 
-          const linkResult = safeCallLinkHook(linkContext, renderHooks.link);
-          decorations.push(buildLinkDecoration(linkResult).range(node.from, node.to));
           return;
         }
 
-        if (node.name === 'InlineCode') {
-          decorations.push(inlineCodeDecoration.range(node.from, node.to));
+        if (isHeadingNode(node.name)) {
+          const decoration = getHeadingDecoration(node.name);
+          if (decoration) decorations.push(decoration.range(node.from, node.to));
           return;
         }
 
@@ -658,13 +778,7 @@ function buildDecorations(
         }
 
         if (node.name === 'FencedCode') {
-          addLineDecorations(
-            decorations,
-            view,
-            node.from,
-            node.to,
-            'cm-una-code-font',
-          );
+          addLineDecorations(decorations, view, node.from, node.to, 'cm-una-code-font');
         }
       },
     });
@@ -737,15 +851,16 @@ function applyInlineStyle(element: HTMLElement, style?: RenderHookStyle): void {
 /**
  * Compare two record-like objects by value.
  */
-function sameStringRecord(
-  left?: Record<string, string>,
-  right?: Record<string, string>,
-): boolean {
+function sameStringRecord(left?: Record<string, string>, right?: Record<string, string>): boolean {
   if (left === right) return true;
   if (!left || !right) return !left && !right;
 
-  const leftEntries = Object.entries(left).sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey));
-  const rightEntries = Object.entries(right).sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey));
+  const leftEntries = Object.entries(left).sort(([leftKey], [rightKey]) =>
+    leftKey.localeCompare(rightKey),
+  );
+  const rightEntries = Object.entries(right).sort(([leftKey], [rightKey]) =>
+    leftKey.localeCompare(rightKey),
+  );
 
   if (leftEntries.length !== rightEntries.length) return false;
 
@@ -1025,7 +1140,6 @@ function createHybridMarkdownViewPlugin(renderHooks?: RenderHooks): Extension {
 
 export function createLivePreviewExtensions(renderHooks?: RenderHooks): Extension {
   return [
-    HYBRID_THEME,
     createStructuredTableExtensions(),
     goalColumnResetPlugin,
     Prec.highest(
@@ -1082,7 +1196,6 @@ class CodeDecorationPlugin {
 
 export function createCodeDecorationExtension(): Extension {
   return [
-    HYBRID_THEME, // Include theme for cm-una-code-font class
     ViewPlugin.fromClass(CodeDecorationPlugin, {
       decorations: (value) => value.decorations,
     }),

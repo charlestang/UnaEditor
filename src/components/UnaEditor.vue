@@ -2,6 +2,7 @@
 import { ref, useAttrs, computed } from 'vue';
 import { useEditor } from '../composables/useEditor';
 import { useFullscreen } from '../composables/useFullscreen';
+import { resolveEditorTheme } from '../themes/editorThemes';
 import type { EditorProps, EditorExposed } from '../types/editor';
 import zhCN from '../locales/zh-CN';
 import enUS from '../locales/en-US';
@@ -51,6 +52,7 @@ const localeMessages = computed(() => {
 
 // Computed style for font settings
 const containerStyle = computed(() => {
+  const resolvedTheme = resolveEditorTheme(props.theme);
   const style: Record<string, string> = {};
   if (props.fontFamily) {
     style['--una-font-family'] = props.fontFamily;
@@ -61,8 +63,7 @@ const containerStyle = computed(() => {
   if (props.fontSize !== undefined) {
     style['--una-font-size'] = `${props.fontSize}px`;
   }
-  style['--una-table-header-bg'] =
-    props.theme === 'dark' ? 'rgba(148, 163, 184, 0.12)' : 'rgba(15, 23, 42, 0.04)';
+  style['--una-table-header-bg'] = resolvedTheme.table.headerBackground;
   return style;
 });
 

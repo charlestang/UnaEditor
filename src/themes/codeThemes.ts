@@ -235,5 +235,5 @@ export function getCodeTheme(name: string): CodeTheme | undefined {
 
 // Get default theme for editor theme
 export function getDefaultCodeTheme(editorTheme: 'light' | 'dark'): CodeTheme {
-  return editorTheme === 'dark' ? CODE_THEMES['one-dark'] : CODE_THEMES['github-light'];
+  return editorTheme === 'dark' ? CODE_THEMES['solarized-dark'] : CODE_THEMES['github-light'];
 }

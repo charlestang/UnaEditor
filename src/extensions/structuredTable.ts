@@ -1906,7 +1906,7 @@ function applyRewrite(
   rewrite: { text: string; focusRow: number; focusCol: number; focusFrom: number; focusTo: number },
   editing: boolean,
 ): boolean {
-  let changeFrom = table.from;
+  const changeFrom = table.from;
   let changeTo = table.to;
   let selectionBase = table.from;
 

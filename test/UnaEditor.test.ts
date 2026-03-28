@@ -40,6 +40,33 @@ async function dispatchEditorKey(view: EditorView, key: string) {
   await nextTick();
 }
 
+function installHostSpanReset() {
+  const style = document.createElement('style');
+  style.textContent = `
+    .cm-editor span {
+      font-style: normal;
+      font-weight: 400;
+      text-decoration: none;
+      font-family: system-ui;
+      font-size: 16px;
+      line-height: 1;
+      color: rgb(12, 34, 56);
+    }
+  `;
+  document.head.prepend(style);
+
+  return () => {
+    style.remove();
+  };
+}
+
+function getCssRulesContaining(fragment: string): string[] {
+  return Array.from(document.styleSheets)
+    .flatMap((sheet) => Array.from(sheet.cssRules ?? []))
+    .map((rule) => rule.cssText)
+    .filter((text) => text.includes(fragment));
+}
+
 describe('UnaEditor', () => {
   it('renders properly', () => {
     const wrapper = mount(UnaEditor, {
@@ -144,6 +171,80 @@ describe('UnaEditor', () => {
     expect(wrapper.props('theme')).toBe('dark');
   });
 
+  it('applies horizontal content padding to keep text away from the editor edges', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: 'content',
+      },
+      attachTo: document.body,
+    });
+
+    try {
+      await getEditorView(wrapper);
+      await nextTick();
+
+      const content = wrapper.find('.cm-content');
+      expect(content.exists()).toBe(true);
+
+      const styles = getComputedStyle(content.element as HTMLElement);
+      expect(styles.paddingLeft).toBe('12px');
+      expect(styles.paddingRight).toBe('12px');
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
+  it('uses compact tabular numerals for editor gutter line numbers', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: 'line 1\nline 2\nline 3',
+        lineNumbers: true,
+      },
+      attachTo: document.body,
+    });
+
+    try {
+      await getEditorView(wrapper);
+      await nextTick();
+
+      const gutterRules = getCssRulesContaining('.cm-lineNumbers .cm-gutterElement');
+      expect(gutterRules.some((text) => text.includes('font-size: 0.92em'))).toBe(true);
+      expect(gutterRules.some((text) => text.includes('align-items: flex-start'))).toBe(true);
+      expect(gutterRules.some((text) => text.includes('line-height: inherit'))).toBe(true);
+      expect(gutterRules.some((text) => text.includes('font-variant-numeric: tabular-nums'))).toBe(
+        true,
+      );
+      expect(
+        gutterRules.some((text) =>
+          text.includes('ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'),
+        ),
+      ).toBe(true);
+      expect(gutterRules.some((text) => text.includes('--una-code-font-family'))).toBe(false);
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
+  it('accepts custom theme objects', () => {
+    const customTheme = {
+      type: 'dark' as const,
+      content: {
+        link: {
+          color: '#f59e0b',
+        },
+      },
+    };
+
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '',
+        theme: customTheme,
+      },
+    });
+
+    expect(wrapper.props('theme')).toEqual(customTheme);
+  });
+
   it('keeps markdown source mode when hybrid rendering is disabled', async () => {
     const wrapper = mount(UnaEditor, {
       props: {
@@ -232,7 +333,7 @@ describe('UnaEditor', () => {
     expect(wrapper.find('.cm-hybrid-heading-1').exists()).toBe(true);
   });
 
-  it('reveals inline markdown source when the cursor enters the active structure', async () => {
+  it('reveals inline markdown source while keeping the strong styling in the active structure', async () => {
     const wrapper = mount(UnaEditor, {
       props: {
         modelValue: '\n**bold**',
@@ -253,8 +354,9 @@ describe('UnaEditor', () => {
 
     await nextTick();
 
-    // When cursor enters the bold text, decorations are removed (active scope)
-    expect(wrapper.find('.cm-hybrid-strong').exists()).toBe(false);
+    // When cursor enters the bold text, source is shown but styling remains.
+    expect(wrapper.find('.cm-hybrid-strong').exists()).toBe(true);
+    expect(wrapper.find('.cm-content').element.textContent).toContain('**bold**');
   });
 
   it('treats the start of a heading as an active cursor position', async () => {
@@ -308,7 +410,7 @@ describe('UnaEditor', () => {
     expect(headingLine.text).toBe('## test header');
   });
 
-  it('switches markdown image syntax between rendered and source states', async () => {
+  it('keeps markdown image preview visible while showing source in the active scope', async () => {
     const markdown = '![Alt](https://example.com/demo.png)';
     const wrapper = mount(UnaEditor, {
       props: {
@@ -329,8 +431,30 @@ describe('UnaEditor', () => {
 
     await nextTick();
 
-    expect(wrapper.find('.cm-hybrid-image').exists()).toBe(false);
+    expect(wrapper.find('.cm-hybrid-image').exists()).toBe(true);
+    expect(wrapper.find('.cm-hybrid-image-inline-preview').exists()).toBe(true);
     expect(wrapper.find('.cm-content').element.textContent).toContain(markdown);
+  });
+
+  it('shows an inline placeholder when the image preview fails to load', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '\n![Alt](https://example.com/demo.png)',
+        livePreview: true,
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    const image = wrapper.find('.cm-hybrid-image-element');
+    expect(image.exists()).toBe(true);
+
+    image.element.dispatchEvent(new Event('error'));
+    await nextTick();
+
+    expect(wrapper.find('.cm-hybrid-image-broken').exists()).toBe(true);
+    expect(wrapper.find('.cm-hybrid-image-status').text()).toContain('图片地址错误或无法获取');
   });
 
   it('applies image render hooks for transformed src and metadata', async () => {
@@ -396,18 +520,24 @@ describe('UnaEditor', () => {
 
     const enhancedSegments = wrapper.findAll('.cm-hybrid-link');
     expect(
-      enhancedSegments.some((segment) => segment.attributes('data-href') === '/resolved./docs/page.md?title=Docs'),
+      enhancedSegments.some(
+        (segment) => segment.attributes('data-href') === '/resolved./docs/page.md?title=Docs',
+      ),
     ).toBe(true);
-    expect(
-      enhancedSegments.some((segment) => segment.attributes('data-kind') === 'internal'),
-    ).toBe(true);
+    expect(enhancedSegments.some((segment) => segment.attributes('data-kind') === 'internal')).toBe(
+      true,
+    );
     expect(
       enhancedSegments.some((segment) => segment.attributes('data-href') === 'user-should-not-win'),
     ).toBe(false);
     expect(
-      enhancedSegments.some((segment) => segment.attributes('style').includes('text-decoration-color')),
+      enhancedSegments.some((segment) =>
+        segment.attributes('style').includes('text-decoration-color'),
+      ),
     ).toBe(true);
-    expect(enhancedSegments.some((segment) => segment.classes().includes('is-internal'))).toBe(true);
+    expect(enhancedSegments.some((segment) => segment.classes().includes('is-internal'))).toBe(
+      true,
+    );
     expect(wrapper.find('.cm-hybrid-strong').text()).toBe('bold');
     expect(wrapper.find('.cm-content').element.textContent).not.toContain('**');
   });
@@ -427,7 +557,9 @@ describe('UnaEditor', () => {
 
     const defaultLinkSegments = defaultWrapper.findAll('.cm-hybrid-link');
     expect(defaultLinkSegments.some((segment) => segment.attributes('data-href'))).toBe(false);
-    expect(defaultWrapper.find('.cm-hybrid-image-element').attributes('data-proxy-kind')).toBeUndefined();
+    expect(
+      defaultWrapper.find('.cm-hybrid-image-element').attributes('data-proxy-kind'),
+    ).toBeUndefined();
 
     const imageOnlyWrapper = mount(UnaEditor, {
       props: {
@@ -451,9 +583,11 @@ describe('UnaEditor', () => {
     expect(imageOnlyWrapper.find('.cm-hybrid-image-element').attributes('data-proxy-kind')).toBe(
       'image-only',
     );
-    expect(imageOnlyWrapper.findAll('.cm-hybrid-link').some((segment) => segment.attributes('data-href'))).toBe(
-      false,
-    );
+    expect(
+      imageOnlyWrapper
+        .findAll('.cm-hybrid-link')
+        .some((segment) => segment.attributes('data-href')),
+    ).toBe(false);
 
     const linkOnlyWrapper = mount(UnaEditor, {
       props: {
@@ -471,16 +605,22 @@ describe('UnaEditor', () => {
     await getEditorView(linkOnlyWrapper);
     await nextTick();
 
-    expect(linkOnlyWrapper.findAll('.cm-hybrid-link').some((segment) => segment.attributes('data-href') === '/link-only./guide')).toBe(
-      true,
-    );
-    expect(linkOnlyWrapper.findAll('.cm-hybrid-link').some((segment) => segment.attributes('data-source') === 'link-only')).toBe(
-      true,
-    );
+    expect(
+      linkOnlyWrapper
+        .findAll('.cm-hybrid-link')
+        .some((segment) => segment.attributes('data-href') === '/link-only./guide'),
+    ).toBe(true);
+    expect(
+      linkOnlyWrapper
+        .findAll('.cm-hybrid-link')
+        .some((segment) => segment.attributes('data-source') === 'link-only'),
+    ).toBe(true);
     expect(linkOnlyWrapper.find('.cm-hybrid-image-element').attributes('src')).toBe(
       'https://example.com/demo.png',
     );
-    expect(linkOnlyWrapper.find('.cm-hybrid-image-element').attributes('data-source')).toBeUndefined();
+    expect(
+      linkOnlyWrapper.find('.cm-hybrid-image-element').attributes('data-source'),
+    ).toBeUndefined();
   });
 
   it('falls back to original values when hooks throw or return nothing', async () => {
@@ -501,10 +641,14 @@ describe('UnaEditor', () => {
     await getEditorView(wrapper);
     await nextTick();
 
-    expect(wrapper.find('.cm-hybrid-image-element').attributes('src')).toBe('https://example.com/demo.png');
-    expect(wrapper.findAll('.cm-hybrid-link').some((segment) => segment.attributes('data-href') === './guide')).toBe(
-      true,
+    expect(wrapper.find('.cm-hybrid-image-element').attributes('src')).toBe(
+      'https://example.com/demo.png',
     );
+    expect(
+      wrapper
+        .findAll('.cm-hybrid-link')
+        .some((segment) => segment.attributes('data-href') === './guide'),
+    ).toBe(true);
     expect(warnSpy).toHaveBeenCalledTimes(1);
     warnSpy.mockRestore();
   });
@@ -529,9 +673,11 @@ describe('UnaEditor', () => {
     await nextTick();
 
     expect(wrapper.find('.cm-hybrid-image-element').attributes('src')).toContain('?version=1');
-    expect(wrapper.findAll('.cm-hybrid-link').some((segment) => segment.attributes('data-href') === '/v1./guide')).toBe(
-      true,
-    );
+    expect(
+      wrapper
+        .findAll('.cm-hybrid-link')
+        .some((segment) => segment.attributes('data-href') === '/v1./guide'),
+    ).toBe(true);
 
     await wrapper.setProps({
       renderHooks: {
@@ -547,9 +693,11 @@ describe('UnaEditor', () => {
     await nextTick();
 
     expect(wrapper.find('.cm-hybrid-image-element').attributes('src')).toContain('?version=2');
-    expect(wrapper.findAll('.cm-hybrid-link').some((segment) => segment.attributes('data-href') === '/v2./guide')).toBe(
-      true,
-    );
+    expect(
+      wrapper
+        .findAll('.cm-hybrid-link')
+        .some((segment) => segment.attributes('data-href') === '/v2./guide'),
+    ).toBe(true);
   });
 
   it('does not invoke render hooks when live preview is disabled', async () => {
@@ -601,7 +749,7 @@ describe('UnaEditor', () => {
     });
     await nextTick();
 
-    expect(wrapper.find('.cm-hybrid-link').exists()).toBe(false);
+    expect(wrapper.find('.cm-hybrid-link').exists()).toBe(true);
     expect(wrapper.find('.cm-content').element.textContent).toContain(linkMarkdown);
 
     view.dispatch({
@@ -611,8 +759,133 @@ describe('UnaEditor', () => {
     });
     await nextTick();
 
-    expect(wrapper.find('.cm-hybrid-image').exists()).toBe(false);
+    expect(wrapper.find('.cm-hybrid-image').exists()).toBe(true);
     expect(wrapper.find('.cm-content').element.textContent).toContain(imageMarkdown);
+  });
+
+  it('keeps emphasis, strong, and inline code styling while showing source in the active scope', async () => {
+    const markdown = '*italic* **bold** `code`';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await focusEditorView(view);
+
+    expect(wrapper.find('.cm-hybrid-emphasis').exists()).toBe(true);
+    expect(wrapper.find('.cm-hybrid-strong').exists()).toBe(true);
+    expect(wrapper.find('.cm-hybrid-inline-code').exists()).toBe(true);
+
+    view.dispatch({
+      selection: {
+        anchor: 2,
+      },
+    });
+    await nextTick();
+
+    expect(wrapper.find('.cm-hybrid-emphasis').exists()).toBe(true);
+    expect(wrapper.find('.cm-content').element.textContent).toContain('*italic*');
+
+    view.dispatch({
+      selection: {
+        anchor: 12,
+      },
+    });
+    await nextTick();
+
+    expect(wrapper.find('.cm-hybrid-strong').exists()).toBe(true);
+    expect(wrapper.find('.cm-content').element.textContent).toContain('**bold**');
+
+    view.dispatch({
+      selection: {
+        anchor: 21,
+      },
+    });
+    await nextTick();
+
+    expect(wrapper.find('.cm-hybrid-inline-code').exists()).toBe(true);
+    expect(wrapper.find('.cm-content').element.textContent).toContain('`code`');
+  });
+
+  it('keeps active inline markdown styles under common host span resets', async () => {
+    const removeHostReset = installHostSpanReset();
+    const markdown = '*italic* **bold** [link](https://example.com) `code`';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+      attachTo: document.body,
+    });
+
+    try {
+      const view = await getEditorView(wrapper);
+      await focusEditorView(view);
+
+      view.dispatch({
+        selection: {
+          anchor: markdown.indexOf('italic') + 1,
+        },
+      });
+      await nextTick();
+
+      const emphasis = wrapper.element.querySelector('.cm-hybrid-emphasis') as HTMLElement | null;
+      const emphasisInner = emphasis?.querySelector('span') as HTMLElement | null;
+      expect(emphasis).not.toBeNull();
+      expect(emphasisInner).not.toBeNull();
+      expect(getComputedStyle(emphasisInner!).fontStyle).toBe('italic');
+
+      view.dispatch({
+        selection: {
+          anchor: markdown.indexOf('bold') + 1,
+        },
+      });
+      await nextTick();
+
+      const strong = wrapper.element.querySelector('.cm-hybrid-strong') as HTMLElement | null;
+      const strongInner = strong?.querySelector('span') as HTMLElement | null;
+      expect(strong).not.toBeNull();
+      expect(strongInner).not.toBeNull();
+      const strongRules = getCssRulesContaining('.cm-hybrid-strong span');
+      expect(strongRules.some((text) => text.includes('font-weight: 700'))).toBe(true);
+
+      view.dispatch({
+        selection: {
+          anchor: markdown.indexOf('link') + 1,
+        },
+      });
+      await nextTick();
+
+      const link = wrapper.element.querySelector('.cm-hybrid-link') as HTMLElement | null;
+      const linkInner = link?.querySelector('span') as HTMLElement | null;
+      expect(link).not.toBeNull();
+      expect(linkInner).not.toBeNull();
+      const linkRules = getCssRulesContaining('.cm-hybrid-link span');
+      expect(linkRules.some((text) => text.includes('rgb(11, 87, 208)'))).toBe(true);
+      expect(linkRules.some((text) => text.includes('text-decoration: underline'))).toBe(true);
+
+      view.dispatch({
+        selection: {
+          anchor: markdown.indexOf('code') + 1,
+        },
+      });
+      await nextTick();
+
+      const inlineCode = wrapper.element.querySelector(
+        '.cm-hybrid-inline-code',
+      ) as HTMLElement | null;
+      const inlineCodeInner = inlineCode?.querySelector('span') as HTMLElement | null;
+      expect(inlineCode).not.toBeNull();
+      expect(inlineCodeInner).not.toBeNull();
+      const codeFontRules = getCssRulesContaining('.cm-una-code-font span');
+      expect(codeFontRules.some((text) => text.includes('--una-code-font-family'))).toBe(true);
+    } finally {
+      wrapper.unmount();
+      removeHostReset();
+    }
   });
 
   it('ignores attempts to change visible link text from render hooks', async () => {
@@ -636,7 +909,9 @@ describe('UnaEditor', () => {
     expect(wrapper.find('.cm-content').element.textContent).toContain('Original Label');
     expect(wrapper.find('.cm-content').element.textContent).not.toContain('Mutated Label');
     expect(
-      wrapper.findAll('.cm-hybrid-link').some((segment) => segment.attributes('data-href') === '/preserved./guide'),
+      wrapper
+        .findAll('.cm-hybrid-link')
+        .some((segment) => segment.attributes('data-href') === '/preserved./guide'),
     ).toBe(true);
   });
 
@@ -712,9 +987,9 @@ describe('UnaEditor', () => {
 
     const lightHeader = lightWrapper.find('[data-cell-row="0"][data-cell-col="1"]');
     expect(lightHeader.exists()).toBe(true);
-    expect((lightWrapper.element as HTMLElement).style.getPropertyValue('--una-table-header-bg')).toBe(
-      'rgba(15, 23, 42, 0.04)',
-    );
+    expect(
+      (lightWrapper.element as HTMLElement).style.getPropertyValue('--una-table-header-bg'),
+    ).toBe('rgba(15, 23, 42, 0.04)');
 
     const darkWrapper = mount(UnaEditor, {
       props: {
@@ -729,9 +1004,31 @@ describe('UnaEditor', () => {
 
     const darkHeader = darkWrapper.find('[data-cell-row="0"][data-cell-col="1"]');
     expect(darkHeader.exists()).toBe(true);
-    expect((darkWrapper.element as HTMLElement).style.getPropertyValue('--una-table-header-bg')).toBe(
-      'rgba(148, 163, 184, 0.12)',
-    );
+    expect(
+      (darkWrapper.element as HTMLElement).style.getPropertyValue('--una-table-header-bg'),
+    ).toBe('rgba(148, 163, 184, 0.12)');
+
+    const customWrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+        theme: {
+          type: 'dark',
+          table: {
+            headerBackground: 'rgba(245, 158, 11, 0.12)',
+          },
+        },
+      },
+    });
+
+    await getEditorView(customWrapper);
+    await nextTick();
+
+    const customHeader = customWrapper.find('[data-cell-row="0"][data-cell-col="1"]');
+    expect(customHeader.exists()).toBe(true);
+    expect(
+      (customWrapper.element as HTMLElement).style.getPropertyValue('--una-table-header-bg'),
+    ).toBe('rgba(245, 158, 11, 0.12)');
   });
 
   it('keeps incomplete tables in source mode while live preview is enabled', async () => {
@@ -813,7 +1110,10 @@ describe('UnaEditor', () => {
     const textNode = content.element.firstChild as Text;
     const originalCaretRangeFromPoint = (
       document as Document & {
-        caretRangeFromPoint?: (x: number, y: number) => { startContainer: Node; startOffset: number };
+        caretRangeFromPoint?: (
+          x: number,
+          y: number,
+        ) => { startContainer: Node; startOffset: number };
       }
     ).caretRangeFromPoint;
 
@@ -1146,8 +1446,7 @@ describe('UnaEditor', () => {
   });
 
   it('enters the structured table from adjacent plain-text lines with ArrowDown in standard mode', async () => {
-    const markdown =
-      'intro\n\n| head | value |\n| --- | --- |\n| alpha | beta |\n\noutro';
+    const markdown = 'intro\n\n| head | value |\n| --- | --- |\n| alpha | beta |\n\noutro';
     const wrapper = mount(UnaEditor, {
       props: {
         modelValue: markdown,
@@ -1167,8 +1466,7 @@ describe('UnaEditor', () => {
   });
 
   it('does not skip a blank line before entering a structured table with ArrowDown in standard mode', async () => {
-    const markdown =
-      '## heading\n\n| head | value |\n| --- | --- |\n| alpha | beta |';
+    const markdown = '## heading\n\n| head | value |\n| --- | --- |\n| alpha | beta |';
     const wrapper = mount(UnaEditor, {
       props: {
         modelValue: markdown,
@@ -1357,8 +1655,12 @@ describe('UnaEditor', () => {
     await nextTick();
 
     const firstCell = wrapper.find('[data-cell-row="2"][data-cell-col="2"]');
-    firstCell.element.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 }));
-    firstCell.element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+    firstCell.element.dispatchEvent(
+      new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 }),
+    );
+    firstCell.element.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }),
+    );
     await nextTick();
 
     let overlay = wrapper.find('.cm-structured-table-overlay').element as HTMLTextAreaElement;
@@ -1368,8 +1670,12 @@ describe('UnaEditor', () => {
     );
 
     const nextCell = wrapper.find('[data-cell-row="3"][data-cell-col="0"]');
-    nextCell.element.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 }));
-    nextCell.element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+    nextCell.element.dispatchEvent(
+      new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 }),
+    );
+    nextCell.element.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }),
+    );
     await nextTick();
 
     overlay = wrapper.find('.cm-structured-table-overlay').element as HTMLTextAreaElement;
@@ -1422,7 +1728,9 @@ describe('UnaEditor', () => {
     const secondCell = wrapper.find('[data-cell-row="1"][data-cell-col="1"]');
 
     expect(firstCell.find('strong').text()).toBe('bold');
-    expect(firstCell.find('.cm-structured-table-link').attributes('href')).toBe('https://example.com');
+    expect(firstCell.find('.cm-structured-table-link').attributes('href')).toBe(
+      'https://example.com',
+    );
     expect(firstCell.find('.cm-structured-table-inline-code').text()).toBe('code|span');
     expect(secondCell.find('br').exists()).toBe(true);
     expect(secondCell.find('.cm-structured-table-image').attributes('src')).toBe(
@@ -1431,8 +1739,7 @@ describe('UnaEditor', () => {
   });
 
   it('keeps the first table line number visible in the gutter when a table is replaced by a widget', async () => {
-    const markdown =
-      'intro\n\n| head | value |\n| --- | --- |\n| alpha | beta |\n\noutro';
+    const markdown = 'intro\n\n| head | value |\n| --- | --- |\n| alpha | beta |\n\noutro';
     const wrapper = mount(UnaEditor, {
       props: {
         modelValue: markdown,
@@ -1580,9 +1887,7 @@ describe('UnaEditor', () => {
       'cm-structured-table-overlay-visible',
     );
 
-    await wrapper
-      .find('[data-structure-kind="column"][data-structure-index="2"]')
-      .trigger('click');
+    await wrapper.find('[data-structure-kind="column"][data-structure-index="2"]').trigger('click');
     await nextTick();
 
     expect(wrapper.find('.cm-structured-table-overlay').classes()).not.toContain(
@@ -1609,9 +1914,7 @@ describe('UnaEditor', () => {
     const view = await getEditorView(wrapper);
     await nextTick();
 
-    await wrapper
-      .find('[data-structure-kind="column"][data-structure-index="1"]')
-      .trigger('click');
+    await wrapper.find('[data-structure-kind="column"][data-structure-index="1"]').trigger('click');
     await nextTick();
 
     await wrapper.find('[data-cell-row="1"][data-cell-col="1"]').trigger('contextmenu', {
@@ -1659,7 +1962,9 @@ describe('UnaEditor', () => {
     await nextTick();
     expect(colHandle.classes()).toContain('cm-structured-table-handle-visible');
 
-    colHandle.element.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, cancelable: true }));
+    colHandle.element.dispatchEvent(
+      new MouseEvent('mousemove', { bubbles: true, cancelable: true }),
+    );
     await nextTick();
     expect(colHandle.classes()).toContain('cm-structured-table-handle-visible');
 
@@ -1694,8 +1999,7 @@ describe('UnaEditor', () => {
   });
 
   it('keeps global vim navigation intact before reaching a structured table', async () => {
-    const markdown =
-      'line 1\nline 2\nline 3\n\n| head | value |\n| --- | --- |\n| alpha | beta |';
+    const markdown = 'line 1\nline 2\nline 3\n\n| head | value |\n| --- | --- |\n| alpha | beta |';
     const wrapper = mount(UnaEditor, {
       props: {
         modelValue: markdown,
@@ -1722,8 +2026,7 @@ describe('UnaEditor', () => {
   });
 
   it('enters the structured table from adjacent plain-text lines in vim normal mode', async () => {
-    const markdown =
-      'intro\n\n| head | value |\n| --- | --- |\n| alpha | beta |\n\noutro';
+    const markdown = 'intro\n\n| head | value |\n| --- | --- |\n| alpha | beta |\n\noutro';
     const wrapper = mount(UnaEditor, {
       props: {
         modelValue: markdown,
@@ -1741,9 +2044,9 @@ describe('UnaEditor', () => {
     Vim.handleKey(cm!, 'j', 'test');
     await nextTick();
     const textarea = wrapper.find('.cm-structured-table-overlay').element as HTMLTextAreaElement;
-    expect(
-      wrapper.find('[data-cell-row="0"][data-cell-col="0"]').classes(),
-    ).toContain('cm-structured-table-cell-active');
+    expect(wrapper.find('[data-cell-row="0"][data-cell-col="0"]').classes()).toContain(
+      'cm-structured-table-cell-active',
+    );
     expect(view.state.selection.main.head).toBe(markdown.indexOf('head'));
     expect(textarea.classList.contains('cm-structured-table-overlay-visible')).toBe(false);
     expect(view.coordsAtPos(view.state.selection.main.head)).not.toBeNull();
@@ -1752,9 +2055,9 @@ describe('UnaEditor', () => {
     await nextTick();
     Vim.handleKey(cm!, 'k', 'test');
     await nextTick();
-    expect(
-      wrapper.find('[data-cell-row="1"][data-cell-col="0"]').classes(),
-    ).toContain('cm-structured-table-cell-active');
+    expect(wrapper.find('[data-cell-row="1"][data-cell-col="0"]').classes()).toContain(
+      'cm-structured-table-cell-active',
+    );
     expect(view.state.selection.main.head).toBe(markdown.indexOf('alpha'));
   });
 
@@ -1889,9 +2192,9 @@ describe('UnaEditor', () => {
 
     await wrapper.find('[data-cell-row="2"][data-cell-col="0"]').trigger('click');
     await nextTick();
-    expect(
-      wrapper.find('[data-cell-row="2"][data-cell-col="0"]').classes(),
-    ).toContain('cm-structured-table-cell-active');
+    expect(wrapper.find('[data-cell-row="2"][data-cell-col="0"]').classes()).toContain(
+      'cm-structured-table-cell-active',
+    );
 
     Vim.handleKey(cm!, 'd', 'test');
     Vim.handleKey(cm!, 'd', 'test');
@@ -2357,6 +2660,139 @@ describe('UnaEditor', () => {
     expect(wrapper.find('.cm-hybrid-heading-1').exists()).toBe(true);
   });
 
+  it('keeps heading line decoration when entering an ATX heading', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '# Heading',
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    expect(wrapper.find('.cm-line.cm-heading-line-1').exists()).toBe(true);
+
+    view.dispatch({ selection: { anchor: 2 } });
+    await nextTick();
+
+    expect(wrapper.find('.cm-line.cm-heading-line-1').exists()).toBe(true);
+  });
+
+  it('keeps the same computed heading font size between live preview and source states', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '# Heading',
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    const previewHeading = wrapper.element.querySelector('.cm-hybrid-heading-1 .tok-heading');
+    expect(previewHeading).not.toBeNull();
+    const previewFontSize = getComputedStyle(previewHeading as Element).fontSize;
+
+    view.dispatch({ selection: { anchor: 2 } });
+    await nextTick();
+
+    const sourceHeading = wrapper.element.querySelector(
+      '.cm-line.cm-heading-line-1 .tok-heading:not(.tok-meta)',
+    );
+    expect(sourceHeading).not.toBeNull();
+    const sourceFontSize = getComputedStyle(sourceHeading as Element).fontSize;
+
+    expect(sourceFontSize).toBe(previewFontSize);
+    expect(sourceFontSize).toBe('1.875em');
+  });
+
+  it('keeps heading source styles under common host span resets', async () => {
+    const removeHostReset = installHostSpanReset();
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '# Heading',
+        livePreview: true,
+      },
+      attachTo: document.body,
+    });
+
+    try {
+      const view = await getEditorView(wrapper);
+      await nextTick();
+
+      const previewHeading = wrapper.element.querySelector('.cm-hybrid-heading-1 .tok-heading');
+      expect(previewHeading).not.toBeNull();
+      const previewStyles = getComputedStyle(previewHeading as Element);
+
+      view.dispatch({ selection: { anchor: 2 } });
+      await nextTick();
+
+      const sourceHeading = wrapper.element.querySelector(
+        '.cm-line.cm-heading-line-1 .tok-heading:not(.tok-meta)',
+      );
+      const sourceMeta = wrapper.element.querySelector('.cm-line.cm-heading-line-1 .tok-meta');
+      expect(sourceHeading).not.toBeNull();
+      expect(sourceMeta).not.toBeNull();
+
+      const sourceStyles = getComputedStyle(sourceHeading as Element);
+      expect(sourceStyles.fontSize).toBe(previewStyles.fontSize);
+      expect(sourceStyles.fontWeight).toBe(previewStyles.fontWeight);
+      expect(sourceStyles.lineHeight).toBe(previewStyles.lineHeight);
+      expect(sourceStyles.fontSize).not.toBe('16px');
+      expect(sourceStyles.lineHeight).not.toBe('1');
+      expect(getComputedStyle(sourceMeta as Element).color).toBe('rgb(107, 114, 128)');
+    } finally {
+      wrapper.unmount();
+      removeHostReset();
+    }
+  });
+
+  it('applies Setext heading line decoration only to the content line', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: 'Heading\n---',
+        livePreview: true,
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    expect(wrapper.findAll('.cm-line.cm-heading-line-2')).toHaveLength(1);
+  });
+
+  it('updates live preview content styles when switching themes at runtime', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '[link](https://example.com)',
+        livePreview: true,
+        theme: 'light',
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    const link = wrapper.find('.cm-hybrid-link');
+    expect(link.exists()).toBe(true);
+    expect(getComputedStyle(link.element).color).toBe('rgb(11, 87, 208)');
+
+    await wrapper.setProps({
+      theme: {
+        type: 'dark',
+        content: {
+          link: {
+            color: '#f59e0b',
+          },
+        },
+      },
+    });
+    await nextTick();
+
+    expect(getComputedStyle(link.element).color).toBe('rgb(245, 158, 11)');
+  });
+
   it('updates code block theme when codeTheme prop changes', async () => {
     const wrapper = mount(UnaEditor, {
       props: {
@@ -2377,6 +2813,545 @@ describe('UnaEditor', () => {
     await nextTick();
 
     expect(getComputedStyle(codeLine.element).backgroundColor).toBe('rgb(40, 44, 52)');
+  });
+
+  it('uses resolved custom theme type for auto code block themes', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '```ts\nconst x = 1;\n```',
+        theme: {
+          type: 'dark',
+          content: {
+            link: {
+              color: '#f59e0b',
+            },
+          },
+        },
+        codeTheme: 'auto',
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    const codeLine = wrapper.find('.cm-code-block-line');
+    expect(codeLine.exists()).toBe(true);
+    expect(getComputedStyle(codeLine.element).backgroundColor).toBe('rgb(0, 43, 54)');
+
+    await wrapper.setProps({
+      theme: {
+        type: 'light',
+        content: {
+          link: {
+            color: '#0b57d0',
+          },
+        },
+      },
+    });
+    await nextTick();
+
+    expect(getComputedStyle(codeLine.element).backgroundColor).toBe('rgb(255, 255, 255)');
+  });
+
+  it('renders an inactive fenced code block opening line as a header row and hides the closing fence source', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '```js\nconsole.log("Hello")\n```',
+        livePreview: true,
+        codeLineNumbers: true,
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    const beginLine = wrapper.element.querySelector('.cm-line.cm-code-block-live-begin');
+    const endLine = wrapper.element.querySelector('.cm-line.cm-code-block-live-end');
+    const headerRules = getCssRulesContaining('.cm-code-block-header-row');
+    const copyIconRules = getCssRulesContaining('.cm-code-block-copy-button::before');
+
+    expect(beginLine).not.toBeNull();
+    expect(endLine).not.toBeNull();
+    expect(beginLine?.querySelector('.cm-code-block-header-row')).not.toBeNull();
+    expect(beginLine?.querySelector('.cm-code-block-language-label')?.textContent).toBe(
+      'JavaScript',
+    );
+    expect(beginLine?.querySelector('.cm-code-block-copy-button')).not.toBeNull();
+    expect(beginLine?.textContent).not.toContain('```js');
+    expect(endLine?.textContent).not.toContain('```');
+    expect(endLine?.querySelector('.cm-code-block-end-cap')).not.toBeNull();
+    expect(headerRules.some((text) => text.includes('position: absolute'))).toBe(true);
+    expect(headerRules.some((text) => text.includes('justify-content: flex-end'))).toBe(true);
+    expect(headerRules.some((text) => text.includes('width: 100%'))).toBe(false);
+    expect(copyIconRules.some((text) => text.includes('mask-image'))).toBe(true);
+  });
+
+  it('does not invent a language label for fences without a language identifier', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '```\nplain text body\n```',
+        livePreview: true,
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    const beginLine = wrapper.element.querySelector('.cm-line.cm-code-block-live-begin');
+    expect(beginLine).not.toBeNull();
+    expect(beginLine?.querySelector('.cm-code-block-header-row')).not.toBeNull();
+    expect(beginLine?.querySelector('.cm-code-block-language-label')).toBeNull();
+    expect(beginLine?.querySelector('.cm-code-block-copy-button')).not.toBeNull();
+  });
+
+  it('restores raw fences for the whole code block when the selection enters the active scope', async () => {
+    const markdown = '```js\nconsole.log("Hello")\n```';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+        codeLineNumbers: true,
+      },
+      attachTo: document.body,
+    });
+
+    try {
+      const view = await getEditorView(wrapper);
+      await focusEditorView(view);
+
+      view.dispatch({
+        selection: {
+          anchor: markdown.indexOf('console') + 1,
+        },
+      });
+      await nextTick();
+
+      const beginLine = wrapper.element.querySelector('.cm-line.cm-code-block-live-begin');
+      const endLine = wrapper.element.querySelector('.cm-line.cm-code-block-live-end');
+
+      expect(beginLine).not.toBeNull();
+      expect(endLine).not.toBeNull();
+      expect(beginLine?.classList.contains('cm-code-block-live-shell')).toBe(true);
+      expect(endLine?.classList.contains('cm-code-block-live-shell')).toBe(true);
+      expect(beginLine?.textContent).toContain('```js');
+      expect(endLine?.textContent).toContain('```');
+      expect(wrapper.element.querySelector('.cm-code-block-header-row')).toBeNull();
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
+  it('uses canonical labels for known aliases and does not mis-normalize unknown languages', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '```js\nconsole.log(1)\n```\n\n```foobar\nconsole.log(2)\n```',
+        livePreview: true,
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    const beginLines = wrapper.element.querySelectorAll('.cm-line.cm-code-block-live-begin');
+    expect(beginLines).toHaveLength(2);
+
+    const knownLabel = beginLines[0]?.querySelector('.cm-code-block-language-label');
+    const unknownLabel = beginLines[1]?.querySelector('.cm-code-block-language-label');
+
+    expect(knownLabel?.textContent).toBe('JavaScript');
+    expect(unknownLabel).toBeNull();
+    expect(beginLines[1]?.textContent).not.toContain('foobar');
+  });
+
+  it('copies only the code body from the header affordance without forcing source mode first', async () => {
+    const originalClipboard = (navigator as Navigator & { clipboard?: Clipboard }).clipboard;
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '```ts\nconst answer = 42;\nconsole.log(answer)\n```',
+        livePreview: true,
+        codeLineNumbers: true,
+      },
+    });
+
+    try {
+      await getEditorView(wrapper);
+      await nextTick();
+
+      const button = wrapper.element.querySelector(
+        '.cm-code-block-copy-button',
+      ) as HTMLButtonElement | null;
+      expect(button).not.toBeNull();
+
+      button?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+      button?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+      await nextTick();
+
+      expect(writeText).toHaveBeenCalledWith('const answer = 42;\nconsole.log(answer)');
+      expect(wrapper.element.querySelector('.cm-code-block-header-row')).not.toBeNull();
+      expect(
+        wrapper.element.querySelector('.cm-line.cm-code-block-live-begin')?.textContent,
+      ).not.toContain('```ts');
+    } finally {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: originalClipboard,
+      });
+    }
+  });
+
+  it('falls back to execCommand copy when the Clipboard API is unavailable', async () => {
+    const originalClipboard = (navigator as Navigator & { clipboard?: Clipboard }).clipboard;
+    const originalExecCommand = document.execCommand;
+    const writeText = vi.fn().mockRejectedValue(new Error('clipboard unavailable'));
+    const execCommand = vi.fn().mockReturnValue(true);
+
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    Object.defineProperty(document, 'execCommand', {
+      configurable: true,
+      value: execCommand,
+    });
+
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '```ts\nconst fallback = true\n```',
+        livePreview: true,
+      },
+    });
+
+    try {
+      await getEditorView(wrapper);
+      await nextTick();
+
+      const button = wrapper.element.querySelector(
+        '.cm-code-block-copy-button',
+      ) as HTMLButtonElement | null;
+      expect(button).not.toBeNull();
+
+      button?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+      await nextTick();
+
+      expect(writeText).toHaveBeenCalledWith('const fallback = true');
+      expect(execCommand).toHaveBeenCalledWith('copy');
+    } finally {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: originalClipboard,
+      });
+      Object.defineProperty(document, 'execCommand', {
+        configurable: true,
+        value: originalExecCommand,
+      });
+    }
+  });
+
+  it('keeps the copy affordance available in readonly live preview mode', async () => {
+    const originalClipboard = (navigator as Navigator & { clipboard?: Clipboard }).clipboard;
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '```ts\nconst readonlyValue = true\n```',
+        livePreview: true,
+        readonly: true,
+      },
+    });
+
+    try {
+      await getEditorView(wrapper);
+      await nextTick();
+
+      const button = wrapper.element.querySelector(
+        '.cm-code-block-copy-button',
+      ) as HTMLButtonElement | null;
+      expect(button).not.toBeNull();
+
+      button?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+
+      expect(writeText).toHaveBeenCalledWith('const readonlyValue = true');
+    } finally {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: originalClipboard,
+      });
+    }
+  });
+
+  it('renders begin body end lines with a shared faux gutter width in live preview code blocks', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '```js\nconsole.log(1)\nconsole.log(2)\n```',
+        livePreview: true,
+        codeLineNumbers: true,
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    const beginLine = wrapper.element.querySelector('.cm-line.cm-code-block-live-begin');
+    const bodyLines = wrapper.element.querySelectorAll('.cm-line.cm-code-block-live-body');
+    const endLine = wrapper.element.querySelector('.cm-line.cm-code-block-live-end');
+
+    expect(beginLine).not.toBeNull();
+    expect(bodyLines).toHaveLength(2);
+    expect(endLine).not.toBeNull();
+
+    const beginSlot = beginLine?.querySelector('.cm-code-block-live-leading-slot');
+    const firstBodySlot = bodyLines[0]?.querySelector('.cm-code-block-live-leading-slot');
+    const secondBodySlot = bodyLines[1]?.querySelector('.cm-code-block-live-leading-slot');
+    const endSlot = endLine?.querySelector('.cm-code-block-live-leading-slot');
+
+    const getGutterClass = (element: Element | null | undefined) =>
+      Array.from(element?.classList ?? []).find((className) =>
+        className.startsWith('cm-code-block-live-gutter-'),
+      );
+
+    expect(beginSlot?.textContent?.trim()).toBe('');
+    expect(firstBodySlot?.textContent).toBe('1');
+    expect(secondBodySlot?.textContent).toBe('2');
+    expect(endSlot?.textContent?.trim()).toBe('');
+    expect(getGutterClass(beginLine)).toBe(getGutterClass(bodyLines[0] ?? null));
+    expect(getGutterClass(endLine)).toBe(getGutterClass(bodyLines[0] ?? null));
+  });
+
+  it('keeps live preview code block shell theming stable across light dark and custom editor themes', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '```ts\nconst themed = true\n```',
+        livePreview: true,
+        theme: 'light',
+        codeTheme: 'auto',
+      },
+    });
+
+    await getEditorView(wrapper);
+    await nextTick();
+
+    const getBodyLine = () => wrapper.find('.cm-line.cm-code-block-live-body');
+    expect(getBodyLine().exists()).toBe(true);
+    expect(getComputedStyle(getBodyLine().element).backgroundColor).toBe('rgb(246, 248, 250)');
+
+    await wrapper.setProps({ theme: 'dark' });
+    await nextTick();
+
+    expect(getComputedStyle(getBodyLine().element).backgroundColor).toBe('rgb(0, 43, 54)');
+
+    await wrapper.setProps({
+      theme: {
+        type: 'dark',
+        content: {
+          link: {
+            color: '#f59e0b',
+          },
+        },
+      },
+    });
+    await nextTick();
+
+    expect(getComputedStyle(getBodyLine().element).backgroundColor).toBe('rgb(0, 43, 54)');
+  });
+
+  it('hides the old pseudo-element line numbers and keeps wrapped code lines aligned to the body column', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue:
+          '```js\nconst veryLongValue = "This line is intentionally long so the wrapped alignment rule stays under test."\n```',
+        livePreview: true,
+        codeLineNumbers: true,
+        lineWrap: true,
+      },
+      attachTo: document.body,
+    });
+
+    try {
+      await getEditorView(wrapper);
+      await nextTick();
+
+      expect(wrapper.element.querySelector('.cm-lineWrapping')).not.toBeNull();
+      expect(wrapper.element.querySelector('.cm-code-block-live-leading-slot')).not.toBeNull();
+
+      const hiddenBeforeRules = getCssRulesContaining(
+        '.cm-line.cm-code-block-live-shell.cm-code-block-line[data-code-line-number]::before',
+      );
+      const shellRules = getCssRulesContaining('.cm-line.cm-code-block-live-shell');
+      const slotRules = getCssRulesContaining('.cm-code-block-live-leading-slot');
+      const themedSlotRules = getCssRulesContaining(
+        '.cm-line.cm-code-block-live-shell .cm-code-block-live-leading-slot',
+      );
+
+      expect(hiddenBeforeRules.some((text) => text.includes('display: none'))).toBe(true);
+      expect(
+        shellRules.some((text) =>
+          text.includes(
+            'padding-left: calc(var(--cm-code-block-live-content-padding, 0.75rem) + var(--cm-code-block-live-gutter-width, 0px) + var(--cm-code-block-live-gutter-gap, 0.5rem))',
+          ),
+        ),
+      ).toBe(true);
+      expect(
+        shellRules.some((text) =>
+          text.includes('margin-left: var(--cm-code-block-live-inline-inset, 0.5rem)'),
+        ),
+      ).toBe(true);
+      expect(
+        shellRules.some((text) =>
+          text.includes('margin-right: var(--cm-code-block-live-inline-inset, 0.5rem)'),
+        ),
+      ).toBe(true);
+      expect(slotRules.some((text) => text.includes('font-size: 0.9em'))).toBe(true);
+      expect(slotRules.some((text) => text.includes('align-items: flex-start'))).toBe(true);
+      expect(slotRules.some((text) => text.includes('line-height: inherit'))).toBe(true);
+      expect(slotRules.some((text) => text.includes('font-variant-numeric: tabular-nums'))).toBe(
+        true,
+      );
+      expect(
+        slotRules.some((text) =>
+          text.includes('ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'),
+        ),
+      ).toBe(true);
+      expect(slotRules.some((text) => text.includes('--una-code-font-family'))).toBe(false);
+      expect(slotRules.some((text) => text.includes('position: absolute'))).toBe(true);
+      expect(slotRules.some((text) => text.includes('left: 0'))).toBe(true);
+      expect(
+        slotRules.some((text) =>
+          text.includes('padding-left: var(--cm-code-block-live-content-padding, 0.75rem)'),
+        ),
+      ).toBe(true);
+      expect(slotRules.some((text) => text.includes('padding-right: 0.32rem'))).toBe(true);
+      expect(
+        slotRules.some((text) =>
+          text.includes('width: calc(var(--cm-code-block-live-content-padding, 0.75rem) + 1.5rem)'),
+        ),
+      ).toBe(true);
+      expect(slotRules.some((text) => text.includes('border-right'))).toBe(false);
+      expect(shellRules.some((text) => text.includes('box-shadow'))).toBe(true);
+      expect(themedSlotRules.some((text) => text.includes('background-color'))).toBe(true);
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
+  it('keeps copy clicks inactive and restores raw fences when entering leaving and selecting across a code block', async () => {
+    const originalClipboard = (navigator as Navigator & { clipboard?: Clipboard }).clipboard;
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+
+    const markdown = 'before\n```js\nconsole.log("Hello")\n```\nafter';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+        codeLineNumbers: true,
+      },
+      attachTo: document.body,
+    });
+
+    try {
+      const view = await getEditorView(wrapper);
+      await nextTick();
+
+      const getBeginLine = () => wrapper.element.querySelector('.cm-line.cm-code-block-live-begin');
+      const getEndLine = () => wrapper.element.querySelector('.cm-line.cm-code-block-live-end');
+
+      const button = wrapper.element.querySelector(
+        '.cm-code-block-copy-button',
+      ) as HTMLButtonElement | null;
+      expect(button).not.toBeNull();
+
+      button?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+      button?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+      await nextTick();
+
+      expect(writeText).toHaveBeenCalledWith('console.log("Hello")');
+      expect(getBeginLine()?.textContent).not.toContain('```js');
+
+      const headerRow = wrapper.element.querySelector('.cm-code-block-header-row');
+      expect(headerRow).not.toBeNull();
+      headerRow?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+      await nextTick();
+
+      expect(getBeginLine()?.textContent).toContain('```js');
+      expect(getEndLine()?.textContent).toContain('```');
+
+      const blockStart = markdown.indexOf('```js');
+      const blockEnd = markdown.lastIndexOf('```') + 3;
+      view.dispatch({
+        selection: {
+          anchor: blockStart,
+          head: blockEnd,
+        },
+      });
+      await nextTick();
+
+      expect(getBeginLine()?.textContent).toContain('```js');
+
+      view.dispatch({
+        selection: {
+          anchor: markdown.indexOf('after') + 1,
+        },
+      });
+      await nextTick();
+
+      expect(getBeginLine()?.textContent).not.toContain('```js');
+      expect(wrapper.element.querySelector('.cm-code-block-header-row')).not.toBeNull();
+    } finally {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: originalClipboard,
+      });
+      wrapper.unmount();
+    }
+  });
+
+  it('keeps gutter fonts independent from codeFontFamily', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: ['```ts', 'const answer = 42', '```'].join('\n'),
+        livePreview: true,
+        lineNumbers: true,
+        codeLineNumbers: true,
+        codeFontFamily: 'Fira Code, monospace',
+      },
+      attachTo: document.body,
+    });
+
+    try {
+      await getEditorView(wrapper);
+      await nextTick();
+
+      const gutterRules = getCssRulesContaining('.cm-lineNumbers .cm-gutterElement');
+      const sourceCodeLineRules = getCssRulesContaining(
+        '.cm-line.cm-code-block-line[data-code-line-number]::before',
+      );
+      const liveSlotRules = getCssRulesContaining('.cm-code-block-live-leading-slot');
+
+      expect(gutterRules.some((text) => text.includes('--una-code-font-family'))).toBe(false);
+      expect(sourceCodeLineRules.some((text) => text.includes('--una-code-font-family'))).toBe(
+        false,
+      );
+      expect(liveSlotRules.some((text) => text.includes('--una-code-font-family'))).toBe(false);
+    } finally {
+      wrapper.unmount();
+    }
   });
 
   it('toggles code block line numbers at runtime', async () => {

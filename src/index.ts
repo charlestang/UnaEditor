@@ -6,6 +6,10 @@ export { default as UnaEditor } from './components/UnaEditor.vue';
 
 // Export types
 export type {
+  EditorTheme,
+  EditorThemeContent,
+  EditorThemeContentOverrides,
+  EditorThemeTable,
   EditorProps,
   EditorEvents,
   EditorExposed,
@@ -17,6 +21,8 @@ export type {
   CustomLocale,
   Locale,
 } from './types/editor';
+
+export { darkEditorTheme, lightEditorTheme } from './themes/editorThemes';
 
 // Export locale utilities
 export { locales, defaultLocale, defineLocale, zhCN, enUS } from './locales';

@@ -4,19 +4,25 @@ import { EditorView, keymap, placeholder as placeholderExt, lineNumbers } from '
 import { defaultKeymap, history, historyKeymap, redo, undo } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { syntaxTree, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
-import { oneDark } from '@codemirror/theme-one-dark';
 import { vim, Vim } from '@replit/codemirror-vim';
 import {
+  HYBRID_BASE_THEME,
+  createContentTheme,
   createLivePreviewExtensions,
   createCodeDecorationExtension,
   setupVimLogicalNavigation,
   remeasureEffect,
 } from '../extensions/hybridMarkdown';
-import { isStructuredTableOverlayTarget, setupStructuredTableVim } from '../extensions/structuredTable';
+import {
+  isStructuredTableOverlayTarget,
+  setupStructuredTableVim,
+} from '../extensions/structuredTable';
 import { createLanguageDescriptions } from '../extensions/languageSupport';
 import { createCodeBlockDecoratorExtension } from '../extensions/codeBlockDecorator';
+import { createCodeBlockLivePreviewExtension } from '../extensions/codeBlockLivePreview';
 import { createCodeThemeExtension } from '../extensions/codeThemeExtension';
 import { getCodeTheme, getDefaultCodeTheme } from '../themes/codeThemes';
+import { resolveEditorTheme } from '../themes/editorThemes';
 import type { EditorProps, Heading, CodeTheme } from '../types/editor';
 
 const fillHeightLayout = EditorView.theme({
@@ -28,7 +34,7 @@ const fillHeightLayout = EditorView.theme({
   },
   '.cm-content': {
     minHeight: '100%',
-    padding: '10px 0',
+    padding: '10px 12px',
   },
   '.cm-gutters': {
     minHeight: '100%',
@@ -36,7 +42,16 @@ const fillHeightLayout = EditorView.theme({
     borderRight: 'none',
   },
   '.cm-lineNumbers .cm-gutterElement': {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-end',
+    boxSizing: 'border-box',
     padding: '0 16px 0 4px',
+    fontSize: '0.92em',
+    lineHeight: 'inherit',
+    fontVariantNumeric: 'tabular-nums',
+    fontFeatureSettings: '"tnum"',
+    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
   },
   // Better selection contrast for dark theme
   '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
@@ -88,6 +103,8 @@ export function useEditor(
   const lineWrapCompartment = new Compartment();
   const codeThemeCompartment = new Compartment();
   const codeBlockDecoratorCompartment = new Compartment();
+  const codeBlockLivePreviewCompartment = new Compartment();
+  const contentThemeCompartment = new Compartment();
 
   // Helper to resolve code theme
   function resolveCodeTheme(
@@ -122,6 +139,8 @@ export function useEditor(
   // Initialize EditorView
   onMounted(() => {
     if (!container.value) return;
+
+    const resolvedTheme = resolveEditorTheme(props.theme);
 
     const extensions = [
       // Undo/redo history
@@ -163,9 +182,23 @@ export function useEditor(
       // Font theme
       fontTheme,
 
+      // Base theme used by both livePreview and source mode
+      HYBRID_BASE_THEME,
+
+      // Content theme (dynamic)
+      contentThemeCompartment.of(createContentTheme(resolvedTheme.content)),
+
       // Code block decorator (always active, independent of hybridMarkdown)
       codeBlockDecoratorCompartment.of(
         createCodeBlockDecoratorExtension(props.codeLineNumbers || false),
+      ),
+
+      codeBlockLivePreviewCompartment.of(
+        props.livePreview
+          ? createCodeBlockLivePreviewExtension({
+              showLineNumbers: props.codeLineNumbers || false,
+            })
+          : [],
       ),
 
       // Optional hybrid markdown rendering layer
@@ -175,11 +208,11 @@ export function useEditor(
       codeDecorationCompartment.of(props.livePreview ? [] : createCodeDecorationExtension()),
 
       // Theme (dynamic)
-      themeCompartment.of(props.theme === 'dark' ? oneDark : []),
+      themeCompartment.of(resolvedTheme.chrome),
 
       // Code block theme (dynamic)
       codeThemeCompartment.of(
-        createCodeThemeExtension(resolveCodeTheme(props.codeTheme, props.theme || 'light')),
+        createCodeThemeExtension(resolveCodeTheme(props.codeTheme, resolvedTheme.type)),
       ),
 
       // Line numbers (dynamic)
@@ -276,38 +309,42 @@ export function useEditor(
     },
   );
 
-  // Watch theme prop and update dynamically
-  watch(
-    () => props.theme,
-    (newTheme) => {
-      if (!editorView.value) return;
-      editorView.value.dispatch({
-        effects: themeCompartment.reconfigure(newTheme === 'dark' ? oneDark : []),
-      });
-    },
-  );
-
-  // Watch codeTheme and theme props for code block theme updates
+  // Watch theme and codeTheme props and update dynamically
   watch(
     () => [props.codeTheme, props.theme] as const,
     ([codeThemeName, editorTheme]) => {
       if (!editorView.value) return;
-      const theme = resolveCodeTheme(codeThemeName, editorTheme || 'light');
+      const resolvedTheme = resolveEditorTheme(editorTheme);
+      const theme = resolveCodeTheme(codeThemeName, resolvedTheme.type);
       editorView.value.dispatch({
-        effects: codeThemeCompartment.reconfigure(createCodeThemeExtension(theme)),
+        effects: [
+          themeCompartment.reconfigure(resolvedTheme.chrome),
+          contentThemeCompartment.reconfigure(createContentTheme(resolvedTheme.content)),
+          codeThemeCompartment.reconfigure(createCodeThemeExtension(theme)),
+          remeasureEffect.of(null),
+        ],
       });
     },
   );
 
   // Watch codeLineNumbers prop and update dynamically
   watch(
-    () => props.codeLineNumbers,
-    (showLineNumbers) => {
+    () => [props.codeLineNumbers, props.livePreview] as const,
+    ([showLineNumbers, livePreview]) => {
       if (!editorView.value) return;
       editorView.value.dispatch({
-        effects: codeBlockDecoratorCompartment.reconfigure(
-          createCodeBlockDecoratorExtension(showLineNumbers || false),
-        ),
+        effects: [
+          codeBlockDecoratorCompartment.reconfigure(
+            createCodeBlockDecoratorExtension(showLineNumbers || false),
+          ),
+          codeBlockLivePreviewCompartment.reconfigure(
+            livePreview
+              ? createCodeBlockLivePreviewExtension({
+                  showLineNumbers: showLineNumbers || false,
+                })
+              : [],
+          ),
+        ],
       });
     },
   );

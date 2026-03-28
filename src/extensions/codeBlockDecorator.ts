@@ -47,8 +47,7 @@ class CodeBlockDecoratorPlugin {
               const line = view.state.doc.line(lineNo);
               const lineText = line.text.trim();
               const isOpeningFence = lineNo === startLine.number;
-              const isClosingFence =
-                lineNo === endLine.number && /^(?:```|~~~)/.test(lineText);
+              const isClosingFence = lineNo === endLine.number && /^(?:```|~~~)/.test(lineText);
 
               if (isOpeningFence || isClosingFence) {
                 decorations.push(
@@ -121,6 +120,10 @@ export function createCodeBlockDecoratorExtension(showLineNumbers: boolean) {
         color: 'rgba(128, 128, 128, 0.6)',
         userSelect: 'none',
         fontSize: '0.9em',
+        lineHeight: 'inherit',
+        fontVariantNumeric: 'tabular-nums',
+        fontFeatureSettings: '"tnum"',
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
         borderRight: '1px solid rgba(128, 128, 128, 0.2)',
       },
     }),

@@ -66,6 +66,92 @@ export interface CodeTheme {
   colors: CodeThemeColors;
 }
 
+export interface EditorThemeHeadingStyle {
+  fontSize: string;
+  fontWeight: string;
+  lineHeight: string;
+}
+
+export interface EditorThemeLinkStyle {
+  color: string;
+  textDecoration: string;
+  textUnderlineOffset: string;
+}
+
+export interface EditorThemeInlineCodeStyle {
+  backgroundColor: string;
+  borderRadius: string;
+  padding: string;
+}
+
+export interface EditorThemeBlockquoteStyle {
+  borderColor: string;
+  backgroundColor: string;
+  paddingLeft: string;
+  fontStyle: string;
+}
+
+export interface EditorThemeSyntaxMarkStyle {
+  color: string;
+}
+
+export interface EditorThemeListMarkerStyle {
+  color: string;
+}
+
+export interface EditorThemeTaskCheckboxStyle {
+  accentColor: string;
+}
+
+export interface EditorThemeContent {
+  heading1: EditorThemeHeadingStyle;
+  heading2: EditorThemeHeadingStyle;
+  heading3: EditorThemeHeadingStyle;
+  heading4: EditorThemeHeadingStyle;
+  heading5: EditorThemeHeadingStyle;
+  heading6: EditorThemeHeadingStyle;
+  link: EditorThemeLinkStyle;
+  emphasis: {
+    fontStyle: string;
+  };
+  strong: {
+    fontWeight: string;
+  };
+  inlineCode: EditorThemeInlineCodeStyle;
+  blockquote: EditorThemeBlockquoteStyle;
+  syntaxMark: EditorThemeSyntaxMarkStyle;
+  listMarker: EditorThemeListMarkerStyle;
+  taskCheckbox: EditorThemeTaskCheckboxStyle;
+}
+
+export interface EditorThemeTable {
+  headerBackground: string;
+}
+
+export interface EditorThemeContentOverrides {
+  heading1?: Partial<EditorThemeHeadingStyle>;
+  heading2?: Partial<EditorThemeHeadingStyle>;
+  heading3?: Partial<EditorThemeHeadingStyle>;
+  heading4?: Partial<EditorThemeHeadingStyle>;
+  heading5?: Partial<EditorThemeHeadingStyle>;
+  heading6?: Partial<EditorThemeHeadingStyle>;
+  link?: Partial<EditorThemeLinkStyle>;
+  emphasis?: Partial<EditorThemeContent['emphasis']>;
+  strong?: Partial<EditorThemeContent['strong']>;
+  inlineCode?: Partial<EditorThemeInlineCodeStyle>;
+  blockquote?: Partial<EditorThemeBlockquoteStyle>;
+  syntaxMark?: Partial<EditorThemeSyntaxMarkStyle>;
+  listMarker?: Partial<EditorThemeListMarkerStyle>;
+  taskCheckbox?: Partial<EditorThemeTaskCheckboxStyle>;
+}
+
+export interface EditorTheme {
+  name?: string;
+  type: 'light' | 'dark';
+  content?: EditorThemeContentOverrides;
+  table?: Partial<EditorThemeTable>;
+}
+
 /**
  * Context passed to image render hooks.
  */
@@ -128,7 +214,7 @@ export interface EditorProps {
   placeholder?: string;
   disabled?: boolean;
   readonly?: boolean;
-  theme?: 'light' | 'dark';
+  theme?: 'light' | 'dark' | EditorTheme;
   fontFamily?: string;
   codeFontFamily?: string;
   fontSize?: number;

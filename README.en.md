@@ -82,6 +82,41 @@ Una Editor has built-in code block syntax highlighting with 9 color schemes and 
 
 Set `code-theme="auto"` to follow the editor theme (`theme="dark"` uses `one-dark`, `theme="light"` uses `github-light`).
 
+## 🌓 Editor Theming
+
+The `theme` prop supports preset theme names and override objects based on `light` / `dark`. Consumers do not need to construct low-level CodeMirror extensions directly.
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { UnaEditor } from 'una-editor';
+import type { EditorTheme } from 'una-editor';
+
+const content = ref('## Themed Heading\n\n[link](https://example.com)');
+
+const customTheme: EditorTheme = {
+  type: 'dark',
+  content: {
+    link: {
+      color: '#f59e0b',
+    },
+    inlineCode: {
+      backgroundColor: 'rgba(245, 158, 11, 0.14)',
+    },
+  },
+  table: {
+    headerBackground: 'rgba(245, 158, 11, 0.12)',
+  },
+};
+</script>
+
+<template>
+  <UnaEditor v-model="content" :theme="customTheme" code-theme="auto" />
+</template>
+```
+
+When `code-theme="auto"` is used, code blocks follow the resolved editor theme `type`, so a custom `dark` theme will still default to `one-dark`.
+
 ### Supported Languages
 
 **Core languages** (loaded synchronously): JavaScript/JS, TypeScript/TS, JSX, TSX, CSS, Shell/Bash

@@ -4,7 +4,12 @@ import { mount } from '@vue/test-utils';
 import { EditorView } from '@codemirror/view';
 import UnaEditor from '../src/components/UnaEditor.vue';
 import { getCodeTheme, getDefaultCodeTheme } from '../src/themes/codeThemes';
-import { getSupportedLanguages, isLanguageSupported } from '../src/extensions/languageSupport';
+import {
+  getLanguageDisplayLabel,
+  getSupportedLanguages,
+  isLanguageSupported,
+  normalizeLanguageIdentifier,
+} from '../src/extensions/languageSupport';
 
 if (typeof Range !== 'undefined') {
   if (!Range.prototype.getClientRects) {
@@ -42,7 +47,7 @@ describe('Code Block Syntax Highlighting', () => {
     it('should get default theme for dark editor', () => {
       const theme = getDefaultCodeTheme('dark');
       expect(theme).toBeDefined();
-      expect(theme.name).toBe('One Dark');
+      expect(theme.name).toBe('Solarized Dark');
       expect(theme.type).toBe('dark');
     });
 
@@ -118,6 +123,17 @@ describe('Code Block Syntax Highlighting', () => {
       expect(languages).toContain('javascript');
       expect(languages).toContain('python');
       expect(languages).toContain('typescript');
+    });
+
+    it('should normalize aliases and resolve display labels consistently', () => {
+      expect(normalizeLanguageIdentifier('JS')).toBe('javascript');
+      expect(normalizeLanguageIdentifier('bash')).toBe('shell');
+      expect(normalizeLanguageIdentifier('unknown-lang')).toBe('unknown-lang');
+
+      expect(getLanguageDisplayLabel('js')).toBe('JavaScript');
+      expect(getLanguageDisplayLabel('javascript')).toBe('JavaScript');
+      expect(getLanguageDisplayLabel('BASH')).toBe('Shell');
+      expect(getLanguageDisplayLabel('unknown-lang')).toBeUndefined();
     });
   });
 

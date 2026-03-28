@@ -10,6 +10,15 @@ import type { CodeTheme } from '../types/editor';
  */
 export function createCodeThemeExtension(theme: CodeTheme): Extension {
   const { colors } = theme;
+  const isPureWhiteBackground = colors.background.toLowerCase() === '#ffffff';
+  const liveShellBackground =
+    theme.type === 'light' && isPureWhiteBackground ? '#f6f8fa' : colors.background;
+  const liveShellBorder =
+    theme.type === 'dark' ? 'rgba(148, 163, 184, 0.16)' : 'rgba(15, 23, 42, 0.1)';
+  const gutterBackground =
+    theme.type === 'dark' ? 'rgba(255, 255, 255, 0.035)' : 'rgba(15, 23, 42, 0.045)';
+  const gutterDivider =
+    theme.type === 'dark' ? 'rgba(148, 163, 184, 0.12)' : 'rgba(15, 23, 42, 0.08)';
 
   return [
     // Expose stable tok-* classes so code-block styles can be scoped to line classes.
@@ -22,16 +31,61 @@ export function createCodeThemeExtension(theme: CodeTheme): Extension {
         color: colors.foreground,
       },
 
+      '.cm-line.cm-code-block-live-shell': {
+        backgroundColor: liveShellBackground,
+        color: colors.foreground,
+        boxShadow: `inset 1px 0 0 ${liveShellBorder}, inset -1px 0 0 ${liveShellBorder}`,
+      },
+
+      '.cm-line.cm-code-block-live-begin': {
+        borderTopLeftRadius: '8px',
+        borderTopRightRadius: '8px',
+        boxShadow: `inset 0 1px 0 ${liveShellBorder}, inset 1px 0 0 ${liveShellBorder}, inset -1px 0 0 ${liveShellBorder}`,
+      },
+
+      '.cm-line.cm-code-block-live-end': {
+        borderBottomLeftRadius: '8px',
+        borderBottomRightRadius: '8px',
+        boxShadow: `inset 0 -1px 0 ${liveShellBorder}, inset 1px 0 0 ${liveShellBorder}, inset -1px 0 0 ${liveShellBorder}`,
+      },
+
       '.cm-line.cm-code-block-fence': {
         color: colors.lineNumber,
       },
 
-      '.cm-line.cm-code-block-line .cm-selectionBackground, .cm-line.cm-code-block-fence .cm-selectionBackground': {
+      '.cm-code-block-live-leading-slot, .cm-code-block-language-label, .cm-code-block-copy-button':
+        {
+          color: colors.lineNumber,
+        },
+
+      '.cm-line.cm-code-block-live-shell .cm-code-block-live-leading-slot': {
+        backgroundColor: gutterBackground,
+        boxShadow: `inset -1px 0 0 ${gutterDivider}`,
+      },
+
+      '.cm-code-block-copy-button:hover': {
+        backgroundColor: colors.selection,
+      },
+
+      '.cm-code-block-copy-button:focus-visible': {
+        backgroundColor: colors.selection,
+      },
+
+      '.cm-line.cm-code-block-line .cm-selectionBackground, .cm-line.cm-code-block-fence .cm-selectionBackground':
+        {
+          backgroundColor: colors.selection,
+        },
+
+      '.cm-line.cm-code-block-live-shell .cm-selectionBackground': {
         backgroundColor: colors.selection,
       },
 
       '.cm-line.cm-code-block-line[data-code-line-number]::before': {
         color: colors.lineNumber,
+      },
+
+      '.cm-line.cm-code-block-live-shell.cm-code-block-line[data-code-line-number]::before': {
+        display: 'none',
       },
 
       '.cm-line.cm-code-block-line .tok-keyword': {

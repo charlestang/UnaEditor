@@ -66,13 +66,69 @@ const EXTENDED_LANGUAGES: Record<string, () => Promise<LanguageSupport>> = {
   },
 };
 
+const LANGUAGE_DISPLAY_LABELS: Record<string, string> = {
+  javascript: 'JavaScript',
+  js: 'JavaScript',
+  typescript: 'TypeScript',
+  ts: 'TypeScript',
+  jsx: 'JSX',
+  tsx: 'TSX',
+  css: 'CSS',
+  shell: 'Shell',
+  bash: 'Shell',
+  sh: 'Shell',
+  python: 'Python',
+  py: 'Python',
+  php: 'PHP',
+  java: 'Java',
+  go: 'Go',
+  rust: 'Rust',
+  c: 'C',
+  cpp: 'C++',
+  'c++': 'C++',
+};
+
+const LANGUAGE_CANONICAL_IDS: Record<string, string> = {
+  javascript: 'javascript',
+  js: 'javascript',
+  typescript: 'typescript',
+  ts: 'typescript',
+  jsx: 'jsx',
+  tsx: 'tsx',
+  css: 'css',
+  shell: 'shell',
+  bash: 'shell',
+  sh: 'shell',
+  python: 'python',
+  py: 'python',
+  php: 'php',
+  java: 'java',
+  go: 'go',
+  rust: 'rust',
+  c: 'c',
+  cpp: 'cpp',
+  'c++': 'cpp',
+};
+
+export function normalizeLanguageIdentifier(language: string): string | undefined {
+  const normalized = language.trim().toLowerCase();
+  if (!normalized) return undefined;
+  return LANGUAGE_CANONICAL_IDS[normalized] ?? normalized;
+}
+
+export function getLanguageDisplayLabel(language: string): string | undefined {
+  const normalized = language.trim().toLowerCase();
+  if (!normalized) return undefined;
+  return LANGUAGE_DISPLAY_LABELS[normalized];
+}
+
 /**
  * Get language support for a given language name
  * @param language - Language name (e.g., 'typescript', 'python')
  * @returns Language support or undefined if not supported
  */
 export async function getLanguageSupport(language: string): Promise<LanguageSupport | undefined> {
-  const normalizedLang = language.toLowerCase();
+  const normalizedLang = normalizeLanguageIdentifier(language) ?? language.toLowerCase();
 
   // Check cache first
   if (languageCache.has(normalizedLang)) {
@@ -107,7 +163,7 @@ export function getSupportedLanguages(): string[] {
  * Check if a language is supported
  */
 export function isLanguageSupported(language: string): boolean {
-  const normalizedLang = language.toLowerCase();
+  const normalizedLang = normalizeLanguageIdentifier(language) ?? language.toLowerCase();
   return normalizedLang in CORE_LANGUAGES || normalizedLang in EXTENDED_LANGUAGES;
 }
 

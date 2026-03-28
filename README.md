@@ -82,6 +82,41 @@ Una Editor 内置了代码块语法高亮功能，支持 9 套配色方案和可
 
 设置 `code-theme="auto"` 可自动跟随编辑器主题（`theme="dark"` 使用 `one-dark`，`theme="light"` 使用 `github-light`）。
 
+## 🌓 编辑器主题
+
+`theme` 支持直接使用预置主题名，也支持传入“基于 light / dark 的覆盖对象”，不需要自行构造底层 CodeMirror 扩展。
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { UnaEditor } from 'una-editor';
+import type { EditorTheme } from 'una-editor';
+
+const content = ref('## Themed Heading\n\n[link](https://example.com)');
+
+const customTheme: EditorTheme = {
+  type: 'dark',
+  content: {
+    link: {
+      color: '#f59e0b',
+    },
+    inlineCode: {
+      backgroundColor: 'rgba(245, 158, 11, 0.14)',
+    },
+  },
+  table: {
+    headerBackground: 'rgba(245, 158, 11, 0.12)',
+  },
+};
+</script>
+
+<template>
+  <UnaEditor v-model="content" :theme="customTheme" code-theme="auto" />
+</template>
+```
+
+当 `code-theme="auto"` 时，代码块会跟随 resolved editor theme 的 `type`，因此自定义 `dark` 主题仍会默认使用 `one-dark`。
+
 ### 支持的语言
 
 **核心语言**（同步加载）：JavaScript/JS、TypeScript/TS、JSX、TSX、CSS、Shell/Bash
