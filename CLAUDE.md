@@ -32,10 +32,12 @@ una-editor/
 
 本项目使用 OpenSpec 进行结构化的变更管理：
 
-1. **创建新变更**: `/opsx:new <change-name>`
-2. **继续变更**: `/opsx:continue` - 创建下一个 artifact
-3. **实现变更**: `/opsx:apply` - 执行任务清单
-4. **归档变更**: `/opsx:archive` - 完成后归档
+OpenSpec skills 存放在 `.agents/skills/`，可通过 `/skills` 或 `$skill-name` 调用。
+
+1. **创建新变更**: `$openspec-new-change`
+2. **继续变更**: `$openspec-continue-change` - 创建下一个 artifact
+3. **实现变更**: `$openspec-apply-change` - 执行任务清单
+4. **归档变更**: `$openspec-archive-change` - 完成后归档
 
 ### 常用命令
 
