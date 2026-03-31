@@ -40,6 +40,24 @@ async function dispatchEditorKey(view: EditorView, key: string) {
   await nextTick();
 }
 
+async function dispatchTypedText(view: EditorView, text: string) {
+  for (const character of text) {
+    const head = view.state.selection.main.head;
+    view.dispatch({
+      changes: {
+        from: head,
+        to: view.state.selection.main.to,
+        insert: character,
+      },
+      selection: {
+        anchor: head + character.length,
+      },
+      userEvent: 'input.type',
+    });
+    await nextTick();
+  }
+}
+
 function installHostSpanReset() {
   const style = document.createElement('style');
   style.textContent = `
@@ -1061,6 +1079,36 @@ describe('UnaEditor', () => {
     expect(wrapper.find('.cm-content').element.textContent).toContain('| head | value |');
   });
 
+  it('does not refocus the editor during ordinary live preview typing when no table overlay is active', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '',
+        livePreview: true,
+      },
+      attachTo: document.body,
+    });
+
+    try {
+      const view = await getEditorView(wrapper);
+      await focusEditorView(view);
+
+      const focusSpy = vi.spyOn(view, 'focus');
+      focusSpy.mockClear();
+
+      view.dispatch({
+        changes: {
+          from: 0,
+          insert: 'a',
+        },
+      });
+      await nextTick();
+
+      expect(focusSpy).not.toHaveBeenCalled();
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
   it('opens a cell editor and writes back markdown table source', async () => {
     const markdown = '| head | value |\n| --- | --- |\n| cell | text |';
     const wrapper = mount(UnaEditor, {
@@ -1536,6 +1584,271 @@ describe('UnaEditor', () => {
     expect(wrapper.find('.cm-structured-table-overlay').classes()).not.toContain(
       'cm-structured-table-overlay-visible',
     );
+    expect(view.state.selection.main.head).toBe(view.state.doc.length);
+  });
+
+  it('adds the first empty data row and trailing blank line when manual input activates a terminal table', async () => {
+    const initialMarkdown = '| head | value |\n| --- | --';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: initialMarkdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+    view.dispatch({
+      selection: {
+        anchor: initialMarkdown.length,
+      },
+    });
+    await nextTick();
+
+    expect(wrapper.find('.cm-structured-table').exists()).toBe(false);
+
+    await dispatchTypedText(view, '-');
+
+    const expectedTableSource = '| head | value |\n| --- | --- |\n|  |  |\n';
+
+    expect(wrapper.find('.cm-structured-table').exists()).toBe(true);
+    expect(view.state.doc.toString()).toBe(expectedTableSource);
+    expect(wrapper.find('.cm-structured-table-overlay').classes()).toContain(
+      'cm-structured-table-overlay-visible',
+    );
+    const activeCell = wrapper.find('[data-cell-row="1"][data-cell-col="0"]');
+    expect(activeCell.classes()).toContain(
+      'cm-structured-table-cell-active',
+    );
+    expect(view.state.selection.main.head).toBe(Number(activeCell.attributes('data-content-from')));
+  });
+
+  it('does not append a trailing blank line when manual activation happens before later content', async () => {
+    const initialMarkdown = '| head | value |\n| --- | --\n\nnext paragraph';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: initialMarkdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    const activationPoint = initialMarkdown.indexOf('\n\nnext paragraph');
+    view.dispatch({
+      selection: {
+        anchor: activationPoint,
+      },
+    });
+    await nextTick();
+
+    await dispatchTypedText(view, '-');
+
+    const expectedMarkdown = '| head | value |\n| --- | --- |\n|  |  |\n\nnext paragraph';
+    expect(view.state.doc.toString()).toBe(expectedMarkdown);
+    expect(wrapper.find('[data-cell-row="1"][data-cell-col="0"]').classes()).toContain(
+      'cm-structured-table-cell-active',
+    );
+  });
+
+  it('shares one undo step between the triggering character and activation-time normalization', async () => {
+    const initialMarkdown = '| head | value |\n| --- | --';
+    const normalizedMarkdown = '| head | value |\n| --- | --- |\n|  |  |\n';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: initialMarkdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+    view.dispatch({
+      selection: {
+        anchor: initialMarkdown.length,
+      },
+    });
+    await nextTick();
+
+    await dispatchTypedText(view, '-');
+    expect(view.state.doc.toString()).toBe(normalizedMarkdown);
+
+    expect(undo(view)).toBe(true);
+    await nextTick();
+    expect(view.state.doc.toString()).toBe(initialMarkdown);
+
+    await dispatchTypedText(view, '-');
+    expect(view.state.doc.toString()).toBe(normalizedMarkdown);
+  });
+
+  it('does not auto-complete rows or exits when pasting a complete table', async () => {
+    const pastedMarkdown = '| head | value |\n| --- | --- |\n| ready | done |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '',
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    view.dispatch({
+      changes: {
+        from: 0,
+        insert: pastedMarkdown,
+      },
+      selection: {
+        anchor: pastedMarkdown.length,
+      },
+      userEvent: 'input.paste',
+    });
+    await nextTick();
+
+    expect(view.state.doc.toString()).toBe(pastedMarkdown);
+    expect(wrapper.find('.cm-structured-table').exists()).toBe(true);
+    expect(view.state.doc.toString()).not.toContain('|  |  |');
+  });
+
+  it('does not append a trailing blank line when mounting an existing structured table at document end', async () => {
+    const markdown = '| head | value |\n| --- | --- |';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    expect(wrapper.find('.cm-structured-table').exists()).toBe(true);
+    expect(view.state.doc.toString()).toBe(markdown);
+  });
+
+  it('selects the terminal table on the first trailing-line Backspace and exits the state on pointer selection', async () => {
+    const markdown = 'intro\n| head | value |\n| --- | --- |\n|  |  |\n';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    view.dispatch({
+      selection: {
+        anchor: view.state.doc.length,
+      },
+    });
+    await nextTick();
+
+    await dispatchEditorKey(view, 'Backspace');
+
+    expect(view.state.doc.toString()).toBe(markdown);
+    expect(wrapper.find('.cm-structured-table-wrapper-selected').exists()).toBe(true);
+
+    view.dispatch({
+      selection: {
+        anchor: 0,
+      },
+      userEvent: 'select.pointer',
+    });
+    await nextTick();
+
+    expect(wrapper.find('.cm-structured-table-wrapper-selected').exists()).toBe(false);
+    expect(view.state.selection.main.head).toBe(0);
+  });
+
+  it('exits the terminal table deletion guard on typed input and inserts text at the anchor line', async () => {
+    const markdown = 'intro\n| head | value |\n| --- | --- |\n|  |  |\n';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    view.dispatch({
+      selection: {
+        anchor: view.state.doc.length,
+      },
+    });
+    await nextTick();
+
+    await dispatchEditorKey(view, 'Backspace');
+    expect(wrapper.find('.cm-structured-table-wrapper-selected').exists()).toBe(true);
+
+    await dispatchTypedText(view, 'x');
+
+    expect(wrapper.find('.cm-structured-table-wrapper-selected').exists()).toBe(false);
+    expect(view.state.doc.toString()).toBe(`${markdown}x`);
+  });
+
+  it('exits the terminal table deletion guard on arrow navigation from the anchor position', async () => {
+    const markdown = 'intro\n| head | value |\n| --- | --- |\n|  |  |\n';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    view.dispatch({
+      selection: {
+        anchor: view.state.doc.length,
+      },
+    });
+    await nextTick();
+
+    await dispatchEditorKey(view, 'Backspace');
+    expect(wrapper.find('.cm-structured-table-wrapper-selected').exists()).toBe(true);
+
+    await dispatchEditorKey(view, 'ArrowLeft');
+
+    expect(wrapper.find('.cm-structured-table-wrapper-selected').exists()).toBe(false);
+    expect(view.state.selection.main.head).toBe(markdown.length - 1);
+  });
+
+  it('deletes the terminal table on the second Backspace and restores it with undo', async () => {
+    const markdown = 'intro\n| head | value |\n| --- | --- |\n|  |  |\n';
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: markdown,
+        livePreview: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    await nextTick();
+
+    view.dispatch({
+      selection: {
+        anchor: view.state.doc.length,
+      },
+    });
+    await nextTick();
+
+    await dispatchEditorKey(view, 'Backspace');
+    await dispatchEditorKey(view, 'Backspace');
+
+    expect(view.state.doc.toString()).toBe('intro\n');
+    expect(view.state.selection.main.head).toBe('intro'.length);
+
+    expect(undo(view)).toBe(true);
+    await nextTick();
+
+    expect(view.state.doc.toString()).toBe(markdown);
+    expect(view.state.selection.main.head).toBe(markdown.length);
   });
 
   it('exits the active cell when clicking outside the table and keeps the external caret position', async () => {

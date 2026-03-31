@@ -1,4 +1,13 @@
-import { EditorSelection, EditorState, Prec, StateEffect, StateField, type Extension } from '@codemirror/state';
+import {
+  EditorSelection,
+  EditorState,
+  Prec,
+  StateEffect,
+  StateField,
+  Transaction,
+  type Extension,
+  type TransactionSpec,
+} from '@codemirror/state';
 import { Decoration, EditorView, GutterMarker, ViewPlugin, WidgetType, keymap, lineNumberWidgetMarker } from '@codemirror/view';
 import type { DecorationSet, ViewUpdate } from '@codemirror/view';
 import { redo, undo } from '@codemirror/commands';
@@ -44,9 +53,15 @@ interface TableStructureSelection {
   index: number;
 }
 
+interface TerminalTableSelection {
+  tableFrom: number;
+  anchor: number;
+}
+
 interface StructuredTableUiState {
   focusCell: TableFocusCell | null;
   structureSelection: TableStructureSelection | null;
+  terminalTableSelection: TerminalTableSelection | null;
 }
 
 interface TableMenuState {
@@ -70,10 +85,12 @@ interface EditingCellBinding {
 const EMPTY_UI_STATE: StructuredTableUiState = {
   focusCell: null,
   structureSelection: null,
+  terminalTableSelection: null,
 };
 
 const setFocusCellEffect = StateEffect.define<TableFocusCell | null>();
 const setStructureSelectionEffect = StateEffect.define<TableStructureSelection | null>();
+const setTerminalTableSelectionEffect = StateEffect.define<TerminalTableSelection | null>();
 
 const structuredTableUiField = StateField.define<StructuredTableUiState>({
   create: () => EMPTY_UI_STATE,
@@ -91,6 +108,13 @@ const structuredTableUiField = StateField.define<StructuredTableUiState>({
             tableFrom: transaction.changes.mapPos(value.structureSelection.tableFrom),
           }
         : null,
+      terminalTableSelection: value.terminalTableSelection
+        ? {
+            ...value.terminalTableSelection,
+            tableFrom: transaction.changes.mapPos(value.terminalTableSelection.tableFrom),
+            anchor: transaction.changes.mapPos(value.terminalTableSelection.anchor),
+          }
+        : null,
     };
 
     for (const effect of transaction.effects) {
@@ -98,6 +122,7 @@ const structuredTableUiField = StateField.define<StructuredTableUiState>({
         next = {
           ...next,
           focusCell: effect.value,
+          terminalTableSelection: effect.value ? null : next.terminalTableSelection,
         };
       }
 
@@ -105,6 +130,16 @@ const structuredTableUiField = StateField.define<StructuredTableUiState>({
         next = {
           ...next,
           structureSelection: effect.value,
+          terminalTableSelection: effect.value ? null : next.terminalTableSelection,
+        };
+      }
+
+      if (effect.is(setTerminalTableSelectionEffect)) {
+        next = {
+          ...next,
+          terminalTableSelection: effect.value,
+          focusCell: effect.value ? null : next.focusCell,
+          structureSelection: effect.value ? null : next.structureSelection,
         };
       }
     }
@@ -131,7 +166,10 @@ const structuredTableDecorationsField = StateField.define<DecorationSet>({
       transaction.docChanged ||
       transaction.selection ||
       transaction.effects.some(
-        (effect) => effect.is(setFocusCellEffect) || effect.is(setStructureSelectionEffect),
+        (effect) =>
+          effect.is(setFocusCellEffect) ||
+          effect.is(setStructureSelectionEffect) ||
+          effect.is(setTerminalTableSelectionEffect),
       )
     ) {
       return buildStructuredTableDecorations(transaction.state);
@@ -153,6 +191,10 @@ const STRUCTURED_TABLE_THEME = EditorView.theme({
     paddingRight: '1.8rem',
     paddingBottom: '1.8rem',
     overflow: 'visible',
+  },
+  '.cm-structured-table-wrapper.cm-structured-table-wrapper-selected .cm-structured-table': {
+    boxShadow: 'inset 0 0 0 1px rgba(37, 99, 235, 0.5)',
+    backgroundColor: 'rgba(219, 234, 254, 0.08)',
   },
   '.cm-structured-table': {
     width: '100%',
@@ -324,7 +366,11 @@ class StructuredTableWidget extends WidgetType {
       this.activeCellFromSelection?.row === other.activeCellFromSelection?.row &&
       this.activeCellFromSelection?.col === other.activeCellFromSelection?.col &&
       sameFocusCell(this.uiState.focusCell, other.uiState.focusCell) &&
-      sameStructureSelection(this.uiState.structureSelection, other.uiState.structureSelection)
+      sameStructureSelection(this.uiState.structureSelection, other.uiState.structureSelection) &&
+      sameTerminalTableSelection(
+        this.uiState.terminalTableSelection,
+        other.uiState.terminalTableSelection,
+      )
     );
   }
 
@@ -337,6 +383,9 @@ class StructuredTableWidget extends WidgetType {
     wrapper.className = 'cm-structured-table-wrapper';
     wrapper.dataset.tableFrom = String(this.table.from);
     wrapper.contentEditable = 'false';
+    if (this.isTableSelected()) {
+      wrapper.classList.add('cm-structured-table-wrapper-selected');
+    }
 
     const table = document.createElement('table');
     table.className = 'cm-structured-table';
@@ -446,7 +495,7 @@ class StructuredTableWidget extends WidgetType {
       if (isActiveCell) {
         cellElement.classList.add('cm-structured-table-cell-active');
       }
-      if (this.isRowSelected(cell.row) || this.isColumnSelected(cell.col)) {
+      if (this.isTableSelected() || this.isRowSelected(cell.row) || this.isColumnSelected(cell.col)) {
         cellElement.classList.add('cm-structured-table-cell-selected');
       }
 
@@ -550,6 +599,10 @@ class StructuredTableWidget extends WidgetType {
   }
 
   private isFocusedCell(row: number, col: number): boolean {
+    if (this.isTableSelected()) {
+      return false;
+    }
+
     const selected = this.uiState.structureSelection;
     if (selected?.tableFrom === this.table.from) {
       return false;
@@ -589,6 +642,10 @@ class StructuredTableWidget extends WidgetType {
         selected.kind === 'column' &&
         selected.index === col,
     );
+  }
+
+  private isTableSelected(): boolean {
+    return this.uiState.terminalTableSelection?.tableFrom === this.table.from;
   }
 }
 
@@ -1052,9 +1109,15 @@ class StructuredTablePlugin {
     }
   }
 
-  private editorOwnsFocus(): boolean {
-    const activeElement = this.view.dom.ownerDocument.activeElement;
-    return activeElement instanceof HTMLElement && this.view.dom.contains(activeElement);
+  private overlayOwnsFocus(): boolean {
+    return this.view.dom.ownerDocument.activeElement === this.overlay;
+  }
+
+  private shouldRestoreEditorFocus(): boolean {
+    return (
+      this.overlayOwnsFocus() ||
+      this.overlay.classList.contains('cm-structured-table-overlay-visible')
+    );
   }
 
   private syncOverlay(): void {
@@ -1067,7 +1130,7 @@ class StructuredTablePlugin {
     }
 
     if (!focusCell || !focusCell.editing) {
-      this.hideOverlay(this.editorOwnsFocus());
+      this.hideOverlay(this.shouldRestoreEditorFocus());
       this.lastOverlayCellKey = null;
       this.fallbackEditingCell = null;
       return;
@@ -1091,14 +1154,14 @@ class StructuredTablePlugin {
 
     const activeCell = cell ?? this.resolveEditingCellBinding(focusCell);
     if (!activeCell) {
-      this.hideOverlay(this.editorOwnsFocus());
+      this.hideOverlay(this.shouldRestoreEditorFocus());
       this.lastOverlayCellKey = null;
       return;
     }
 
     const domCell = this.findCellElement(focusCell.tableFrom, focusCell.row, focusCell.col);
     if (!domCell) {
-      this.hideOverlay(this.editorOwnsFocus());
+      this.hideOverlay(this.shouldRestoreEditorFocus());
       return;
     }
     const cellRect = domCell.getBoundingClientRect();
@@ -1372,11 +1435,15 @@ class StructuredTablePlugin {
 
   private clearFocusedCell(): void {
     const state = this.view.state.field(structuredTableUiField);
-    if (!state.focusCell && !state.structureSelection) return;
+    if (!state.focusCell && !state.structureSelection && !state.terminalTableSelection) return;
     this.fallbackEditingCell = null;
 
     this.view.dispatch({
-      effects: [setFocusCellEffect.of(null), setStructureSelectionEffect.of(null)],
+      effects: [
+        setFocusCellEffect.of(null),
+        setStructureSelectionEffect.of(null),
+        setTerminalTableSelectionEffect.of(null),
+      ],
     });
   }
 
@@ -1748,6 +1815,13 @@ function sameStructureSelection(
     left?.kind === right?.kind &&
     left?.index === right?.index
   );
+}
+
+function sameTerminalTableSelection(
+  left: TerminalTableSelection | null,
+  right: TerminalTableSelection | null,
+): boolean {
+  return left?.tableFrom === right?.tableFrom && left?.anchor === right?.anchor;
 }
 
 function shouldOpenOverlay(view: EditorView): boolean {
@@ -2267,6 +2341,27 @@ function handleTableBackspace(view: EditorView): boolean {
   return false;
 }
 
+function handleTerminalTableBackspace(view: EditorView): boolean {
+  const terminalSelection = view.state.field(structuredTableUiField).terminalTableSelection;
+  if (terminalSelection) {
+    return deleteSelectedTerminalTable(view, terminalSelection);
+  }
+
+  const guard = resolveTerminalTableDeletionGuard(view.state);
+  if (!guard) return false;
+
+  view.dispatch({
+    selection: EditorSelection.single(guard.anchor),
+    effects: setTerminalTableSelectionEffect.of({
+      tableFrom: guard.table.from,
+      anchor: guard.anchor,
+    }),
+    scrollIntoView: true,
+    userEvent: 'delete.backward',
+  });
+  return true;
+}
+
 function moveVimHorizontalInsideTable(view: EditorView, direction: -1 | 1): boolean {
   return moveHorizontalCaretInsideTable(view, direction, false);
 }
@@ -2728,33 +2823,179 @@ export function setupStructuredTableVim(): void {
   // so it only applies when the active focus is inside a structured table.
 }
 
-const structuredTableTransactionFilter = EditorState.transactionFilter.of((transaction) => {
-  if (!transaction.docChanged) return transaction;
-
-  const focusCell = transaction.startState.field(structuredTableUiField, false)?.focusCell;
-  if (!focusCell) return transaction;
-
-  const table = findTableMappingAt(transaction.startState, focusCell.tableFrom);
-  const cell = table?.rows[focusCell.row]?.cells[focusCell.col];
-  if (!table || !cell) return transaction;
-
+function getSingleDocumentChange(transaction: Transaction): {
+  from: number;
+  to: number;
+  insert: string;
+} | null {
   let changeCount = 0;
-  let deletionFrom = -1;
-  let deletionTo = -1;
-  let deletionInsert = '';
+  let changeFrom = -1;
+  let changeTo = -1;
+  let changeInsert = '';
+
   transaction.changes.iterChanges((fromA, toA, _fromB, _toB, insert) => {
     changeCount += 1;
-    deletionFrom = fromA;
-    deletionTo = toA;
-    deletionInsert = insert.toString();
+    changeFrom = fromA;
+    changeTo = toA;
+    changeInsert = insert.toString();
   });
 
   if (changeCount !== 1) {
-    return transaction;
+    return null;
   }
 
-  if (deletionInsert.length > 0) {
-    return transaction;
+  return {
+    from: changeFrom,
+    to: changeTo,
+    insert: changeInsert,
+  };
+}
+
+function findTableNearPosition(state: EditorState, position: number): TableMapping | null {
+  const clampedPosition = clamp(position, 0, state.doc.length);
+  const probes = new Set<number>([
+    clampedPosition,
+    Math.max(0, clampedPosition - 1),
+    Math.min(state.doc.length, clampedPosition + 1),
+  ]);
+
+  for (const probe of probes) {
+    const table = findTableMappingAt(state, probe);
+    if (table) return table;
+  }
+
+  return (
+    findTableMappingsInRange(
+      state,
+      Math.max(0, clampedPosition - 1),
+      Math.min(state.doc.length, clampedPosition + 1),
+    )[0] ?? null
+  );
+}
+
+function getReplayAnnotations(transaction: Transaction) {
+  const annotations = [];
+  const addToHistory = transaction.annotation(Transaction.addToHistory);
+  if (addToHistory != null) {
+    annotations.push(Transaction.addToHistory.of(addToHistory));
+  }
+
+  const remote = transaction.annotation(Transaction.remote);
+  if (remote != null) {
+    annotations.push(Transaction.remote.of(remote));
+  }
+
+  return annotations.length ? annotations : undefined;
+}
+
+function replayTransactionSpec(
+  transaction: Transaction,
+  extras: Partial<TransactionSpec> = {},
+): TransactionSpec {
+  const combinedEffects = [
+    ...transaction.effects,
+    ...(Array.isArray(extras.effects) ? extras.effects : extras.effects ? [extras.effects] : []),
+  ];
+  const userEvent = transaction.annotation(Transaction.userEvent);
+
+  return {
+    changes: extras.changes ?? transaction.changes,
+    selection: extras.selection ?? transaction.selection,
+    effects: combinedEffects.length ? combinedEffects : undefined,
+    annotations: extras.annotations ?? getReplayAnnotations(transaction),
+    userEvent: extras.userEvent ?? userEvent,
+    scrollIntoView: extras.scrollIntoView ?? transaction.scrollIntoView,
+    sequential: extras.sequential,
+  };
+}
+
+function buildManualActivationSpecs(transaction: Transaction): readonly TransactionSpec[] | null {
+  if (!transaction.docChanged || !transaction.isUserEvent('input.type')) {
+    return null;
+  }
+
+  const singleChange = getSingleDocumentChange(transaction);
+  if (!singleChange || singleChange.from !== singleChange.to || singleChange.insert.length !== 1) {
+    return null;
+  }
+
+  const previousTable = findTableNearPosition(transaction.startState, singleChange.from);
+  if (previousTable) {
+    return null;
+  }
+
+  const nextPosition = transaction.newSelection.main.head;
+  const nextTable =
+    findTableNearPosition(transaction.state, nextPosition) ??
+    findTableNearPosition(transaction.state, singleChange.from + singleChange.insert.length);
+  if (!nextTable) {
+    return null;
+  }
+
+  const needsInitialDataRow = nextTable.rows.length === 1;
+  const needsTrailingBlankLine = nextTable.to === transaction.newDoc.length;
+  if (!needsInitialDataRow && !needsTrailingBlankLine) {
+    return null;
+  }
+
+  const specs: TransactionSpec[] = [replayTransactionSpec(transaction)];
+
+  if (needsInitialDataRow) {
+    const rewrite = insertTableRow(nextTable, 0, 'after');
+    specs.push({
+      sequential: true,
+      changes: {
+        from: nextTable.from,
+        to: nextTable.to,
+        insert: needsTrailingBlankLine ? `${rewrite.text}\n` : rewrite.text,
+      },
+      selection: EditorSelection.single(
+        nextTable.from + rewrite.focusFrom,
+        nextTable.from + rewrite.focusTo,
+      ),
+      effects: [
+        setFocusCellEffect.of({
+          tableFrom: nextTable.from,
+          row: rewrite.focusRow,
+          col: rewrite.focusCol,
+          editing: true,
+        }),
+        setStructureSelectionEffect.of(null),
+      ],
+      scrollIntoView: true,
+    });
+    return specs;
+  }
+
+  if (needsTrailingBlankLine) {
+    specs.push({
+      sequential: true,
+      changes: {
+        from: transaction.newDoc.length,
+        insert: '\n',
+      },
+    });
+    return specs;
+  }
+
+  return null;
+}
+
+function buildFocusedCellLineDeleteSpecs(
+  transaction: Transaction,
+): readonly TransactionSpec[] | null {
+  if (!transaction.docChanged) return null;
+
+  const focusCell = transaction.startState.field(structuredTableUiField, false)?.focusCell;
+  if (!focusCell) return null;
+
+  const table = findTableMappingAt(transaction.startState, focusCell.tableFrom);
+  const cell = table?.rows[focusCell.row]?.cells[focusCell.col];
+  if (!table || !cell) return null;
+
+  const singleChange = getSingleDocumentChange(transaction);
+  if (!singleChange || singleChange.insert.length > 0) {
+    return null;
   }
 
   const line = transaction.startState.doc.lineAt(cell.contentFrom);
@@ -2762,8 +3003,8 @@ const structuredTableTransactionFilter = EditorState.transactionFilter.of((trans
   const lineDeleteTo =
     line.to < transaction.startState.doc.length ? line.to + 1 : transaction.startState.doc.length;
 
-  if (deletionFrom !== lineDeleteFrom || deletionTo !== lineDeleteTo) {
-    return transaction;
+  if (singleChange.from !== lineDeleteFrom || singleChange.to !== lineDeleteTo) {
+    return null;
   }
 
   const rewrite = deleteTableRow(table, focusCell.row);
@@ -2803,6 +3044,111 @@ const structuredTableTransactionFilter = EditorState.transactionFilter.of((trans
       scrollIntoView: true,
     },
   ];
+}
+
+function shouldExitTerminalTableSelection(transaction: Transaction): boolean {
+  if (
+    transaction.effects.some(
+      (effect) =>
+        effect.is(setTerminalTableSelectionEffect) ||
+        effect.is(setFocusCellEffect) ||
+        effect.is(setStructureSelectionEffect),
+    )
+  ) {
+    return false;
+  }
+
+  return transaction.docChanged || transaction.selection !== undefined || transaction.isUserEvent('select');
+}
+
+function resolveTerminalTableDeletionGuard(
+  state: EditorState,
+): { table: TableMapping; anchor: number } | null {
+  const selection = state.selection.main;
+  if (!selection.empty) return null;
+
+  const line = state.doc.lineAt(selection.head);
+  if (line.number !== state.doc.lines || line.length > 0 || selection.head !== line.from) {
+    return null;
+  }
+
+  if (line.number <= 1) {
+    return null;
+  }
+
+  const previousLine = state.doc.line(line.number - 1);
+  const table = findTableMappingForLine(state, previousLine.from, previousLine.to);
+  if (!table) {
+    return null;
+  }
+
+  return {
+    table,
+    anchor: line.from,
+  };
+}
+
+function findPositionBeforeTable(state: EditorState, table: TableMapping): number {
+  const tableLine = state.doc.lineAt(table.from);
+  if (tableLine.number <= 1) {
+    return 0;
+  }
+
+  return state.doc.line(tableLine.number - 1).to;
+}
+
+function deleteSelectedTerminalTable(
+  view: EditorView,
+  terminalSelection: TerminalTableSelection,
+): boolean {
+  const table = findTableMappingAt(view.state, terminalSelection.tableFrom);
+  if (!table) {
+    view.dispatch({
+      effects: setTerminalTableSelectionEffect.of(null),
+    });
+    return true;
+  }
+
+  const anchorLine = view.state.doc.lineAt(terminalSelection.anchor);
+  const deleteTo = anchorLine.to;
+
+  view.dispatch({
+    changes: {
+      from: table.from,
+      to: deleteTo,
+      insert: '',
+    },
+    selection: EditorSelection.single(findPositionBeforeTable(view.state, table)),
+    effects: [
+      setTerminalTableSelectionEffect.of(null),
+      setFocusCellEffect.of(null),
+      setStructureSelectionEffect.of(null),
+    ],
+    scrollIntoView: true,
+    userEvent: 'delete.backward',
+  });
+  return true;
+}
+
+const structuredTableTransactionFilter = EditorState.transactionFilter.of((transaction) => {
+  const terminalSelection = transaction.startState.field(structuredTableUiField, false)?.terminalTableSelection;
+  if (terminalSelection && shouldExitTerminalTableSelection(transaction)) {
+    return replayTransactionSpec(transaction, {
+      effects: [setTerminalTableSelectionEffect.of(null)],
+    });
+  }
+
+  const activationSpecs = buildManualActivationSpecs(transaction);
+  if (activationSpecs) {
+    return activationSpecs;
+  }
+
+  const focusedCellLineDeleteSpecs = buildFocusedCellLineDeleteSpecs(transaction);
+  if (focusedCellLineDeleteSpecs) {
+    return focusedCellLineDeleteSpecs;
+  }
+
+  return transaction;
 });
 
 export function createStructuredTableExtensions(): Extension {
@@ -2826,7 +3172,7 @@ export function createStructuredTableExtensions(): Extension {
         { key: 'Shift-Enter', run: (view) => handleTableEnterNavigation(view, true) },
         { key: 'Tab', run: (view) => handleTableTabNavigation(view, false) },
         { key: 'Shift-Tab', run: (view) => handleTableTabNavigation(view, true) },
-        { key: 'Backspace', run: (view) => handleTableBackspace(view) },
+        { key: 'Backspace', run: (view) => handleTerminalTableBackspace(view) || handleTableBackspace(view) },
         { key: 'Escape', run: (view) => clearEditing(view) },
       ]),
     ),
