@@ -22,6 +22,7 @@ const props = withDefaults(defineProps<EditorProps>(), {
   theme: 'light',
   codeTheme: 'auto',
   codeLineNumbers: false,
+  contentMaxWidth: 720,
 });
 
 // Define emits
@@ -50,7 +51,7 @@ const localeMessages = computed(() => {
   return props.locale || zhCN;
 });
 
-// Computed style for font settings
+// Computed style for editor CSS variables
 const containerStyle = computed(() => {
   const resolvedTheme = resolveEditorTheme(props.theme);
   const style: Record<string, string> = {};
@@ -63,6 +64,8 @@ const containerStyle = computed(() => {
   if (props.fontSize !== undefined) {
     style['--una-font-size'] = `${props.fontSize}px`;
   }
+  style['--una-content-max-width'] = `${props.contentMaxWidth}px`;
+  style['--una-editor-surface'] = resolvedTheme.type === 'dark' ? '#282c34' : '#ffffff';
   style['--una-table-header-bg'] = resolvedTheme.table.headerBackground;
   return style;
 });
@@ -124,6 +127,7 @@ defineExpose<EditorExposed>({
   height: 100%;
   min-height: 200px;
   position: relative;
+  background: var(--una-editor-surface, #ffffff);
 }
 
 /* Browser fullscreen mode - fills viewport */
@@ -131,7 +135,15 @@ defineExpose<EditorExposed>({
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: white;
+  background: var(--una-editor-surface, #ffffff);
+}
+
+.una-editor:fullscreen {
+  background: var(--una-editor-surface, #ffffff);
+}
+
+.una-editor:fullscreen::backdrop {
+  background: var(--una-editor-surface, #ffffff);
 }
 
 /* Fullscreen tip */

@@ -21,9 +21,17 @@ This document lists the properties, events, and exposed methods provided by the 
 | `fontFamily`             | `string`  | —       | Custom font family for the editor.                                                                         |
 | `codeFontFamily`         | `string`  | —       | Custom font family for code.                                                                               |
 | `fontSize`               | `number`  | —       | Font size in pixels.                                                                                       |
+| `contentMaxWidth`        | `number`  | `720`   | Maximum width of the prose content column in pixels. It constrains body content, images, tables, and code blocks, but does not include the left line-number gutter. |
 | `renderHooks`            | `RenderHooks` | —   | Live-preview-only render hooks for synchronously transforming image URLs, exposing resolved link targets, and injecting custom classes, `data-*` attributes, and inline styles. |
 | `codeTheme`              | `'auto' \| CodeThemeName` | `'auto'` | Code block color scheme. `'auto'` follows editor theme. Options: `'one-dark'`, `'dracula'`, `'monokai'`, `'solarized-dark'`, `'nord'`, `'tokyo-night'`, `'github-light'`, `'solarized-light'`, `'atom-one-light'`. |
 | `codeLineNumbers`        | `boolean` | `false` | Whether to show line numbers in code blocks.                                                               |
+
+### `contentMaxWidth`
+
+- Defaults to `720`
+- The value only measures the prose content column, not the left line-number gutter
+- When the host container is narrower than this value, the content column shrinks automatically instead of creating extra horizontal scrolling
+- Images, structured tables, and code blocks follow the same shared content-column width constraint
 
 ## `renderHooks`
 

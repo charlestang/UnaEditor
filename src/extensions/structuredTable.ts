@@ -184,6 +184,7 @@ const STRUCTURED_TABLE_THEME = EditorView.theme({
   '.cm-structured-table-wrapper': {
     position: 'relative',
     margin: '0',
+    display: 'block',
     boxSizing: 'border-box',
     width: '100%',
     maxWidth: '100%',

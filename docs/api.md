@@ -21,9 +21,17 @@
 | `fontFamily`             | `string`  | —       | 自定义编辑器字体族。                                                     |
 | `codeFontFamily`         | `string`  | —       | 自定义代码字体族。                                                       |
 | `fontSize`               | `number`  | —       | 字体大小（px）。                                                         |
+| `contentMaxWidth`        | `number`  | `720`   | 正文内容列的最大宽度（px）。只约束正文、图片、表格、代码块等内容区域，不包含左侧行号 gutter。 |
 | `renderHooks`            | `RenderHooks` | —   | 仅在 `livePreview` 下生效的渲染钩子，可同步改写图片地址、暴露链接目标，并注入自定义 `class`、`data-*` 属性和行内样式。 |
 | `codeTheme`              | `'auto' \| CodeThemeName` | `'auto'` | 代码块配色方案。`'auto'` 自动跟随编辑器主题。可选值：`'one-dark'`、`'dracula'`、`'monokai'`、`'solarized-dark'`、`'nord'`、`'tokyo-night'`、`'github-light'`、`'solarized-light'`、`'atom-one-light'`。 |
 | `codeLineNumbers`        | `boolean` | `false` | 是否在代码块中显示行号。                                                 |
+
+### `contentMaxWidth`
+
+- 默认值为 `720`
+- 该值只表示正文内容列宽度，不包含左侧 line number gutter
+- 当宿主容器宽度小于该值时，内容列会自动收缩，不额外制造横向滚动
+- 图片、结构化表格、代码块会跟随同一条内容版心宽度约束
 
 ## `renderHooks`
 

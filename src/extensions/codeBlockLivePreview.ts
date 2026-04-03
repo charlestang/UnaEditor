@@ -411,8 +411,9 @@ class CodeBlockLivePreviewPlugin {
 const CODE_BLOCK_LIVE_PREVIEW_THEME = EditorView.baseTheme({
   '.cm-line.cm-code-block-live-shell': {
     position: 'relative',
-    marginLeft: 'var(--cm-code-block-live-inline-inset, 0.5rem)',
-    marginRight: 'var(--cm-code-block-live-inline-inset, 0.5rem)',
+    boxSizing: 'border-box',
+    width: '100%',
+    maxWidth: '100%',
     paddingLeft:
       'calc(var(--cm-code-block-live-content-padding, 0.75rem) + var(--cm-code-block-live-gutter-width, 0px) + var(--cm-code-block-live-gutter-gap, 0.5rem))',
     paddingRight: 'var(--cm-code-block-live-content-padding, 0.75rem)',

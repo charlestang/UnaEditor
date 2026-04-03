@@ -34,10 +34,14 @@ const fillHeightLayout = EditorView.theme({
   },
   '.cm-content': {
     minHeight: '100%',
+    maxWidth: 'var(--una-content-max-width, 720px)',
+    marginLeft: 'auto',
+    marginRight: 'auto',
     padding: '10px 12px',
   },
   '.cm-gutters': {
     minHeight: '100%',
+    flexShrink: '0',
     backgroundColor: 'transparent',
     borderRight: 'none',
   },
@@ -447,6 +451,15 @@ export function useEditor(
           editorView.value?.dispatch({ effects: remeasureEffect.of(null) });
         });
       }
+    },
+    { flush: 'post' },
+  );
+
+  watch(
+    () => props.contentMaxWidth,
+    () => {
+      if (!editorView.value) return;
+      editorView.value.dispatch({ effects: remeasureEffect.of(null) });
     },
     { flush: 'post' },
   );

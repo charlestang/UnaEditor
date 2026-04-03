@@ -2879,6 +2879,44 @@ describe('UnaEditor', () => {
     expect(style).toContain('--una-font-size: 18px');
   });
 
+  it('applies default contentMaxWidth as CSS variable on the container', () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '',
+      },
+    });
+
+    const style = wrapper.attributes('style') ?? '';
+    expect(style).toContain('--una-content-max-width: 720px');
+  });
+
+  it('applies custom contentMaxWidth as CSS variable on the container', () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '',
+        contentMaxWidth: 840,
+      },
+    });
+
+    const style = wrapper.attributes('style') ?? '';
+    expect(style).toContain('--una-content-max-width: 840px');
+  });
+
+  it('applies a theme-aware editor surface CSS variable on the container', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '',
+        theme: 'light',
+      },
+    });
+
+    expect(wrapper.attributes('style')).toContain('--una-editor-surface: #ffffff');
+
+    await wrapper.setProps({ theme: 'dark' });
+
+    expect(wrapper.attributes('style')).toContain('--una-editor-surface: #282c34');
+  });
+
   it('does not set font CSS variables when font props are not provided', () => {
     const wrapper = mount(UnaEditor, {
       props: {
@@ -2905,6 +2943,87 @@ describe('UnaEditor', () => {
     await wrapper.setProps({ fontSize: 20 });
 
     expect(wrapper.attributes('style')).toContain('--una-font-size: 20px');
+  });
+
+  it('updates contentMaxWidth CSS variable and remeasures when the prop changes at runtime', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '',
+        contentMaxWidth: 720,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    const dispatchSpy = vi.spyOn(view, 'dispatch');
+
+    expect(wrapper.attributes('style')).toContain('--una-content-max-width: 720px');
+
+    await wrapper.setProps({ contentMaxWidth: 840 });
+
+    expect(wrapper.attributes('style')).toContain('--una-content-max-width: 840px');
+    expect(dispatchSpy).toHaveBeenCalled();
+    expect(
+      dispatchSpy.mock.calls.some(([transaction]) =>
+        Boolean(transaction && typeof transaction === 'object' && 'effects' in transaction),
+      ),
+    ).toBe(true);
+  });
+
+  it('centers the content column while keeping the gutter anchored to the left edge', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: 'line 1\nline 2',
+        lineNumbers: true,
+      },
+      attachTo: document.body,
+    });
+
+    try {
+      await getEditorView(wrapper);
+      await nextTick();
+
+      const contentRules = getCssRulesContaining('.cm-content');
+      const gutterRules = getCssRulesContaining('.cm-gutters');
+
+      expect(
+        contentRules.some((text) => text.includes('max-width: var(--una-content-max-width, 720px)')),
+      ).toBe(true);
+      expect(contentRules.some((text) => text.includes('margin-left: auto'))).toBe(true);
+      expect(contentRules.some((text) => text.includes('margin-right: auto'))).toBe(true);
+      expect(gutterRules.some((text) => text.includes('flex-shrink: 0'))).toBe(true);
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
+  it('keeps the editor surface background aligned with the active theme in fullscreen', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: 'content',
+        theme: 'light',
+      },
+      attachTo: document.body,
+    });
+
+    try {
+      await getEditorView(wrapper);
+      await nextTick();
+
+      expect(wrapper.attributes('style')).toContain('--una-editor-surface: #ffffff');
+
+      await wrapper.setProps({ theme: 'dark' });
+      await nextTick();
+
+      expect(wrapper.attributes('style')).toContain('--una-editor-surface: #282c34');
+
+      wrapper.vm.toggleFullscreen('browser');
+      await nextTick();
+
+      expect(wrapper.classes()).toContain('una-editor-fullscreen-browser');
+      expect(wrapper.attributes('style')).toContain('--una-editor-surface: #282c34');
+    } finally {
+      wrapper.unmount();
+    }
   });
 
   it('applies cm-una-code-font decoration to inline code in non-livePreview mode', async () => {
@@ -3516,16 +3635,11 @@ describe('UnaEditor', () => {
           ),
         ),
       ).toBe(true);
-      expect(
-        shellRules.some((text) =>
-          text.includes('margin-left: var(--cm-code-block-live-inline-inset, 0.5rem)'),
-        ),
-      ).toBe(true);
-      expect(
-        shellRules.some((text) =>
-          text.includes('margin-right: var(--cm-code-block-live-inline-inset, 0.5rem)'),
-        ),
-      ).toBe(true);
+      expect(shellRules.some((text) => text.includes('box-sizing: border-box'))).toBe(true);
+      expect(shellRules.some((text) => text.includes('width: 100%'))).toBe(true);
+      expect(shellRules.some((text) => text.includes('max-width: 100%'))).toBe(true);
+      expect(shellRules.some((text) => text.includes('margin-left'))).toBe(false);
+      expect(shellRules.some((text) => text.includes('margin-right'))).toBe(false);
       expect(slotRules.some((text) => text.includes('font-size: 0.9em'))).toBe(true);
       expect(slotRules.some((text) => text.includes('align-items: flex-start'))).toBe(true);
       expect(slotRules.some((text) => text.includes('line-height: inherit'))).toBe(true);
@@ -3554,6 +3668,33 @@ describe('UnaEditor', () => {
       expect(slotRules.some((text) => text.includes('border-right'))).toBe(false);
       expect(shellRules.some((text) => text.includes('box-shadow'))).toBe(true);
       expect(themedSlotRules.some((text) => text.includes('background-color'))).toBe(true);
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
+  it('lets preview images and structured tables follow the shared content column width', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue:
+          '![img](https://example.com/image.png)\n\n| head | value |\n| --- | --- |\n| text | cell |',
+        livePreview: true,
+      },
+      attachTo: document.body,
+    });
+
+    try {
+      await getEditorView(wrapper);
+      await nextTick();
+
+      const imageRules = getCssRulesContaining('.cm-hybrid-image-element');
+      const tableRules = getCssRulesContaining('.cm-structured-table-wrapper');
+
+      expect(imageRules.some((text) => text.includes('max-width: 100%'))).toBe(true);
+      expect(imageRules.some((text) => text.includes('28rem'))).toBe(false);
+      expect(tableRules.some((text) => text.includes('display: block'))).toBe(true);
+      expect(tableRules.some((text) => text.includes('width: 100%'))).toBe(true);
+      expect(tableRules.some((text) => text.includes('max-width: 100%'))).toBe(true);
     } finally {
       wrapper.unmount();
     }

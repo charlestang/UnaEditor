@@ -218,6 +218,7 @@ export interface EditorProps {
   fontFamily?: string;
   codeFontFamily?: string;
   fontSize?: number;
+  contentMaxWidth?: number;
 
   /**
    * Code block theme

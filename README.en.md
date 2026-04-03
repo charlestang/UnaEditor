@@ -24,6 +24,7 @@ A lightweight, high-performance Vue 3 editor component library based on CodeMirr
 - 🧩 **Structured Table Editing**: Supports structured table rendering, cell editing, row/column handles, append, and delete interactions under `livePreview`.
 - ⌨️ **Vim Mode Support**: Built-in classic Vim modal editing and keybindings.
 - 🎨 **Code Block Syntax Highlighting**: Built-in multi-language syntax highlighting with 9 color schemes and optional line numbers.
+- 📐 **Default 720px Content Column**: Wide layouts keep prose readable by constraining body content, images, tables, and code blocks to a shared column width.
 - 📦 **Dual Output Formats**: Supports both ESM and CommonJS.
 
 ## 📦 Installation
@@ -55,6 +56,20 @@ const content = ref('# Hello Una Editor!');
 <template>
   <UnaEditor v-model="content" :live-preview="true" :vim-mode="false" />
 </template>
+```
+
+## ✍️ Content Column
+
+Una Editor constrains the prose content column to a maximum width of `720px` by default, while the left line-number gutter stays pinned to the outer editor edge. Images, structured tables, and code blocks follow the same shared width rule.
+
+Use `contentMaxWidth` when you want a different writing column:
+
+```vue
+<UnaEditor
+  v-model="content"
+  :content-max-width="840"
+  :live-preview="true"
+/>
 ```
 
 ## 🎨 Code Block Syntax Highlighting

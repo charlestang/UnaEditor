@@ -24,6 +24,7 @@
 - 🧩 **结构化表格编辑**：在 `livePreview` 下支持结构化表格渲染、单元格编辑、行列 handle、追加与删除等交互。
 - ⌨️ **Vim 模式支持**：内置经典的 Vim 模态编辑与键位绑定。
 - 🎨 **代码块语法高亮**：内置多语言语法高亮，支持 9 套配色方案和可选行号。
+- 📐 **默认 720px 内容版心**：宽屏下自动限制正文内容列宽度，图片、表格和代码块跟随统一版心。
 - 📦 **双格式输出**：同时支持 ESM 和 CommonJS。
 
 ## 📦 安装
@@ -55,6 +56,20 @@ const content = ref('# Hello Una Editor!');
 <template>
   <UnaEditor v-model="content" :live-preview="true" :vim-mode="false" />
 </template>
+```
+
+## ✍️ 内容版心
+
+Una Editor 默认会将正文内容列限制在 `720px` 的最大宽度内，而左侧行号 gutter 仍然贴靠编辑器外框左侧显示。图片、结构化表格和代码块会跟随同一条内容版心约束。
+
+如果你想覆盖默认版心宽度，可以使用 `contentMaxWidth`：
+
+```vue
+<UnaEditor
+  v-model="content"
+  :content-max-width="840"
+  :live-preview="true"
+/>
 ```
 
 ## 🎨 代码块语法高亮

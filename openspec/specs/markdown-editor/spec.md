@@ -10,7 +10,7 @@
 
 The Editor component SHALL support Vue 3 v-model for two-way content binding.
 
-The Editor component SHALL accept optional `fontFamily` (string), `codeFontFamily` (string), and `fontSize` (number, in px) props. These props SHALL be converted to CSS variables (`--una-font-family`, `--una-code-font-family`, `--una-font-size`) on the editor container element.
+The Editor component SHALL accept optional `fontFamily` (string), `codeFontFamily` (string), `fontSize` (number, in px), and `contentMaxWidth` (number, in px) props. These props SHALL be converted to CSS variables (`--una-font-family`, `--una-code-font-family`, `--una-font-size`, `--una-content-max-width`) on the editor container element.
 
 #### Scenario: External content update
 

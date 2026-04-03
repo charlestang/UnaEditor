@@ -218,7 +218,7 @@ export const HYBRID_BASE_THEME = EditorView.theme({
   },
   '.cm-hybrid-image-element': {
     display: 'block',
-    maxWidth: 'min(100%, 28rem)',
+    maxWidth: '100%',
     maxHeight: '14rem',
     borderRadius: '8px',
     objectFit: 'contain',

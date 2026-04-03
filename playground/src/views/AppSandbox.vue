@@ -18,6 +18,7 @@ const themeMode = ref<'light' | 'dark' | 'custom-dark'>('light');
 const fontSize = ref<number | undefined>(undefined);
 const fontFamily = ref<string | undefined>(undefined);
 const codeFontFamily = ref<string | undefined>(undefined);
+const contentMaxWidth = ref(720);
 const codeTheme = ref<
   | 'auto'
   | 'one-dark'
@@ -271,6 +272,17 @@ const contentWithLineNumbers = () =>
       </div>
 
       <div class="control-group">
+        <label>内容版心：</label>
+        <select v-model="contentMaxWidth">
+          <option :value="560">560px</option>
+          <option :value="640">640px</option>
+          <option :value="720">720px</option>
+          <option :value="840">840px</option>
+          <option :value="960">960px</option>
+        </select>
+      </div>
+
+      <div class="control-group">
         <label>代码主题：</label>
         <select v-model="codeTheme">
           <option value="auto">自动</option>
@@ -322,6 +334,7 @@ const contentWithLineNumbers = () =>
         :font-size="fontSize"
         :font-family="fontFamily"
         :code-font-family="codeFontFamily"
+        :content-max-width="contentMaxWidth"
         :code-theme="codeTheme"
         :code-line-numbers="codeLineNumbers"
         placeholder="请输入 Markdown 内容..."
