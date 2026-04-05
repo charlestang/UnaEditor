@@ -6,25 +6,25 @@ This document lists the properties, events, and exposed methods provided by the 
 
 ## Properties (Props)
 
-| Property                 | Type      | Default | Description                                                                                                |
-| ------------------------ | --------- | ------- | ---------------------------------------------------------------------------------------------------------- |
-| `modelValue` / `v-model` | `string`  | `''`    | The content of the editor.                                                                                 |
-| `livePreview`            | `boolean` | `false` | Whether to enable hybrid rendering mode. Provides a WYSIWYG experience for headings, emphasis, links, images, task lists, structured tables, and more. |
-| `vimMode`                | `boolean` | `false` | Whether to enable Vim keymap mode. Supports classic Vim modal editing (`Mod-s` is still available).        |
-| `lineNumbers`            | `boolean` | `true`  | Whether to show line numbers.                                                                              |
-| `lineWrap`               | `boolean` | `true`  | Whether to enable line wrapping.                                                                           |
-| `theme`                  | `'light' \| 'dark'` | `'light'` | Editor theme.                                                                                      |
-| `locale`                 | `string \| CustomLocale` | `'zh-CN'` | Language setting. Supports `'zh-CN'`, `'en-US'`, or a custom locale object.                   |
-| `placeholder`            | `string`  | —       | Placeholder text.                                                                                          |
-| `disabled`               | `boolean` | —       | Whether editing is disabled.                                                                               |
-| `readonly`               | `boolean` | —       | Whether the editor is read-only.                                                                           |
-| `fontFamily`             | `string`  | —       | Custom font family for the editor.                                                                         |
-| `codeFontFamily`         | `string`  | —       | Custom font family for code.                                                                               |
-| `fontSize`               | `number`  | —       | Font size in pixels.                                                                                       |
-| `contentMaxWidth`        | `number`  | `720`   | Maximum width of the prose content column in pixels. It constrains body content, images, tables, and code blocks, but does not include the left line-number gutter. |
-| `renderHooks`            | `RenderHooks` | —   | Live-preview-only render hooks for synchronously transforming image URLs, exposing resolved link targets, and injecting custom classes, `data-*` attributes, and inline styles. |
-| `codeTheme`              | `'auto' \| CodeThemeName` | `'auto'` | Code block color scheme. `'auto'` follows editor theme. Options: `'one-dark'`, `'dracula'`, `'monokai'`, `'solarized-dark'`, `'nord'`, `'tokyo-night'`, `'github-light'`, `'solarized-light'`, `'atom-one-light'`. |
-| `codeLineNumbers`        | `boolean` | `false` | Whether to show line numbers in code blocks.                                                               |
+| Property                 | Type                      | Default   | Description                                                                                                                                                                                                        |
+| ------------------------ | ------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `modelValue` / `v-model` | `string`                  | `''`      | The content of the editor.                                                                                                                                                                                         |
+| `livePreview`            | `boolean`                 | `false`   | Whether to enable hybrid rendering mode. Provides a WYSIWYG experience for headings, emphasis, links, images, task lists, structured tables, and more.                                                             |
+| `vimMode`                | `boolean`                 | `false`   | Whether to enable Vim keymap mode. Supports classic Vim modal editing (`Mod-s` is still available).                                                                                                                |
+| `lineNumbers`            | `boolean`                 | `true`    | Whether to show line numbers.                                                                                                                                                                                      |
+| `lineWrap`               | `boolean`                 | `true`    | Whether to enable line wrapping.                                                                                                                                                                                   |
+| `theme`                  | `'light' \| 'dark'`       | `'light'` | Editor theme.                                                                                                                                                                                                      |
+| `locale`                 | `string \| CustomLocale`  | `'zh-CN'` | Language setting. Supports `'zh-CN'`, `'en-US'`, or a custom locale object.                                                                                                                                        |
+| `placeholder`            | `string`                  | —         | Placeholder text.                                                                                                                                                                                                  |
+| `disabled`               | `boolean`                 | —         | Disables user-initiated editing and image drag/paste intake. External `modelValue` updates still sync into the mounted instance.                                                                                   |
+| `readonly`               | `boolean`                 | —         | Makes the editor read-only while preserving focus, selection, copy, and other non-mutating interactions.                                                                                                           |
+| `fontFamily`             | `string`                  | —         | Custom font family for the editor.                                                                                                                                                                                 |
+| `codeFontFamily`         | `string`                  | —         | Custom font family for code.                                                                                                                                                                                       |
+| `fontSize`               | `number`                  | —         | Font size in pixels.                                                                                                                                                                                               |
+| `contentMaxWidth`        | `number`                  | `720`     | Maximum width of the prose content column in pixels. It constrains body content, images, tables, and code blocks, but does not include the left line-number gutter.                                                |
+| `renderHooks`            | `RenderHooks`             | —         | Live-preview-only render hooks for synchronously transforming image URLs, exposing resolved link targets, and injecting custom classes, `data-*` attributes, and inline styles.                                    |
+| `codeTheme`              | `'auto' \| CodeThemeName` | `'auto'`  | Code block color scheme. `'auto'` follows editor theme. Options: `'one-dark'`, `'dracula'`, `'monokai'`, `'solarized-dark'`, `'nord'`, `'tokyo-night'`, `'github-light'`, `'solarized-light'`, `'atom-one-light'`. |
+| `codeLineNumbers`        | `boolean`                 | `false`   | Whether to show line numbers in code blocks.                                                                                                                                                                       |
 
 ### `contentMaxWidth`
 
@@ -80,14 +80,14 @@ const renderHooks = {
 
 ## Events
 
-| Event Name          | Callback Parameters | Description                                                                         |
-| ------------------- | ------------------- | ----------------------------------------------------------------------------------- |
-| `update:modelValue` | `(value: string)`   | Triggered when the editor content changes, used for two-way binding with `v-model`. |
-| `change`            | `(value: string)`   | Triggered after the editor document actually changes.                               |
-| `save`              | `()`                | Triggered when the user invokes the save shortcut such as `Mod-s`.                  |
-| `focus`             | `()`                | Triggered when the editor receives focus.                                           |
-| `blur`              | `()`                | Triggered when the editor loses focus.                                              |
-| `drop`              | `(files: File[])`   | Triggered when image files are dropped or pasted into the editor.                   |
+| Event Name          | Callback Parameters | Description                                                                                                                    |
+| ------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `update:modelValue` | `(value: string)`   | Triggered when the editor content changes, used for two-way binding with `v-model`.                                            |
+| `change`            | `(value: string)`   | Triggered after the editor document actually changes.                                                                          |
+| `save`              | `()`                | Triggered when the user invokes the save shortcut such as `Mod-s`.                                                             |
+| `focus`             | `()`                | Triggered when the editor receives focus.                                                                                      |
+| `blur`              | `()`                | Triggered when the editor loses focus.                                                                                         |
+| `drop`              | `(files: File[])`   | Triggered when image files are dropped or pasted into the editor. It remains the compatibility event surface for both sources. |
 
 <!-- More events can be added here later, such as focus, blur, change, etc. -->
 
@@ -95,15 +95,15 @@ const renderHooks = {
 
 If you need to call the editor's built-in methods externally, you can add a `ref` to the component to get the instance object and call its exposed API.
 
-| Method Name        | Type/Signature                                               | Description                                                                                                                                                                                                |
-| ------------------ | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `focus`            | `() => void`                                                 | Focuses the editor.                                                                                                                                                                                        |
-| `getSelection`     | `() => string`                                               | Gets the currently selected text. Returns an empty string if nothing is selected.                                                                                                                          |
-| `insertText`       | `(text: string) => void`                                     | Inserts text at the current cursor position. If a selection exists, it will be replaced. The cursor is moved to the end of the inserted text.                                                              |
-| `getHeadings`      | `() => Array<{ text: string, level: number, line: number }>` | Extracts all Markdown headings from the document using internal AST parsing. Returns an array containing the text, level, and line number of each heading, perfect for building a Table of Contents (TOC). |
-| `scrollToLine`     | `(lineNumber: number) => void`                               | Smoothly scrolls the editor viewport so that the specified 1-based line number becomes visible.                                                                                                            |
-| `undoHistory`      | `() => boolean`                                              | Performs one undo step; returns `false` when there is no undo history available.                                                                                                                           |
-| `redoHistory`      | `() => boolean`                                              | Performs one redo step; returns `false` when there is no redo history available.                                                                                                                           |
-| `toggleFullscreen` | `(mode?: 'browser' \| 'screen') => void`                     | Toggles fullscreen mode (supports filling the browser viewport or the entire screen via native API).                                                                                                       |
-| `exitFullscreen`   | `() => void`                                                 | Exits fullscreen mode.                                                                                                                                                                                     |
-| `getEditorView`    | `() => EditorView \| undefined`                              | [Advanced] Gets the underlying CodeMirror 6 `EditorView` instance. Can be used for deep custom extensions (Note: manipulating the document directly may cause Vue's `v-model` state to desync).            |
+| Method Name        | Type/Signature                                               | Description                                                                                                                                                                                                            |
+| ------------------ | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `focus`            | `() => void`                                                 | Focuses the editor.                                                                                                                                                                                                    |
+| `getSelection`     | `() => string`                                               | Gets the currently selected text. Returns an empty string if nothing is selected.                                                                                                                                      |
+| `insertText`       | `(text: string) => void`                                     | Inserts text at the current cursor position. If a selection exists, it will be replaced. The cursor is moved to the end of the inserted text. The method becomes a no-op when the editor is `readonly` or `disabled`.  |
+| `getHeadings`      | `() => Array<{ text: string, level: number, line: number }>` | Extracts all Markdown headings from the document using internal AST parsing. Returns an array containing the text, level, and line number of each heading, perfect for building a Table of Contents (TOC).             |
+| `scrollToLine`     | `(lineNumber: number) => void`                               | Smoothly scrolls the editor viewport so that the specified 1-based line number becomes visible.                                                                                                                        |
+| `undoHistory`      | `() => boolean`                                              | Performs one undo step; returns `false` when there is no undo history available, or when the editor is `readonly` / `disabled`.                                                                                        |
+| `redoHistory`      | `() => boolean`                                              | Performs one redo step; returns `false` when there is no redo history available, or when the editor is `readonly` / `disabled`.                                                                                        |
+| `toggleFullscreen` | `(mode?: 'browser' \| 'screen') => void`                     | Toggles fullscreen mode (supports filling the browser viewport or the entire screen via native API).                                                                                                                   |
+| `exitFullscreen`   | `() => void`                                                 | Exits fullscreen mode.                                                                                                                                                                                                 |
+| `getEditorView`    | `() => EditorView \| undefined`                              | [Advanced compatibility API] Gets the underlying CodeMirror 6 `EditorView` instance. Prefer the component's stable high-level methods for standard integrations. Direct document mutations may desync Vue's `v-model`. |

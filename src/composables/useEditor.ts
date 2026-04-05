@@ -1,29 +1,29 @@
 import { ref, watch, onMounted, onBeforeUnmount, type Ref } from 'vue';
-import { EditorState, Compartment, Prec } from '@codemirror/state';
+import { EditorState, Compartment, Prec, type Extension } from '@codemirror/state';
 import { EditorView, keymap, placeholder as placeholderExt, lineNumbers } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, redo, undo } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { syntaxTree, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
-import { vim, Vim } from '@replit/codemirror-vim';
 import {
   HYBRID_BASE_THEME,
   createContentTheme,
   createLivePreviewExtensions,
   createCodeDecorationExtension,
-  setupVimLogicalNavigation,
   remeasureEffect,
 } from '../extensions/hybridMarkdown';
-import {
-  isStructuredTableOverlayTarget,
-  setupStructuredTableVim,
-} from '../extensions/structuredTable';
+import { isStructuredTableOverlayTarget } from '../extensions/structuredTable';
 import { createLanguageDescriptions } from '../extensions/languageSupport';
 import { createCodeBlockDecoratorExtension } from '../extensions/codeBlockDecorator';
 import { createCodeBlockLivePreviewExtension } from '../extensions/codeBlockLivePreview';
 import { createCodeThemeExtension } from '../extensions/codeThemeExtension';
-import { getCodeTheme, getDefaultCodeTheme } from '../themes/codeThemes';
-import { resolveEditorTheme } from '../themes/editorThemes';
-import type { EditorProps, Heading, CodeTheme } from '../types/editor';
+import {
+  ensureVimGlobalSetup,
+  registerVimSaveHandler,
+  unregisterVimSaveHandler,
+  vim,
+} from '../extensions/vim';
+import type { Heading, EditorProps } from '../types/editor';
+import type { EditorFileInputSource, EditorRuntimeInput } from '../types/editorRuntime';
 
 const fillHeightLayout = EditorView.theme({
   '&': {
@@ -81,267 +81,349 @@ const fontTheme = EditorView.theme({
   },
 });
 
-export function useEditor(
-  container: Ref<HTMLElement | undefined>,
-  props: EditorProps,
-  emit: {
-    (e: 'update:modelValue', value: string): void;
-    (e: 'change', value: string): void;
-    (e: 'save'): void;
-    (e: 'focus'): void;
-    (e: 'blur'): void;
-    (e: 'drop', files: File[]): void;
-  },
-) {
-  const editorView = ref<EditorView>();
-  let isInternalUpdate = false;
+interface EditorRuntimeCompartments {
+  theme: Compartment;
+  hybrid: Compartment;
+  codeDecoration: Compartment;
+  vim: Compartment;
+  lineNumbers: Compartment;
+  placeholder: Compartment;
+  readOnly: Compartment;
+  editable: Compartment;
+  lineWrap: Compartment;
+  codeTheme: Compartment;
+  codeBlockDecorator: Compartment;
+  codeBlockLivePreview: Compartment;
+  contentTheme: Compartment;
+}
 
-  // Compartments for dynamic reconfiguration
-  const themeCompartment = new Compartment();
-  const hybridCompartment = new Compartment();
-  const codeDecorationCompartment = new Compartment();
-  const vimCompartment = new Compartment();
-  const lineNumbersCompartment = new Compartment();
-  const placeholderCompartment = new Compartment();
-  const readOnlyCompartment = new Compartment();
-  const lineWrapCompartment = new Compartment();
-  const codeThemeCompartment = new Compartment();
-  const codeBlockDecoratorCompartment = new Compartment();
-  const codeBlockLivePreviewCompartment = new Compartment();
-  const contentThemeCompartment = new Compartment();
+interface EditorSyncState {
+  isApplyingExternalUpdate: boolean;
+}
 
-  // Helper to resolve code theme
-  function resolveCodeTheme(
-    codeTheme: 'auto' | string | undefined,
-    editorTheme: 'light' | 'dark',
-  ): CodeTheme {
-    if (!codeTheme || codeTheme === 'auto') {
-      return getDefaultCodeTheme(editorTheme);
-    }
+interface EditorDocumentSyncStrategy {
+  applyExternalValue: (view: EditorView, value: string) => void;
+}
 
-    const theme = getCodeTheme(codeTheme);
-    if (!theme) {
-      console.warn(`Unknown code theme: ${codeTheme}, falling back to default`);
-      return getDefaultCodeTheme(editorTheme);
-    }
+interface EditorRuntimeContext {
+  editorView: Ref<EditorView | undefined>;
+  compartments: EditorRuntimeCompartments;
+  syncState: EditorSyncState;
+  documentSyncStrategy: EditorDocumentSyncStrategy;
+}
 
-    return theme;
-  }
+interface EditorInteractivityState {
+  isDisabled: boolean;
+  isReadonly: boolean;
+  isReadOnly: boolean;
+  isEditable: boolean;
+}
 
-  // Extract image files from DataTransfer
-  function extractImageFiles(dataTransfer: DataTransfer): File[] {
-    const files: File[] = [];
-    for (let i = 0; i < dataTransfer.files.length; i++) {
-      const file = dataTransfer.files[i];
-      if (file.type.startsWith('image/')) {
-        files.push(file);
-      }
-    }
-    return files;
-  }
+function createRuntimeCompartments(): EditorRuntimeCompartments {
+  return {
+    theme: new Compartment(),
+    hybrid: new Compartment(),
+    codeDecoration: new Compartment(),
+    vim: new Compartment(),
+    lineNumbers: new Compartment(),
+    placeholder: new Compartment(),
+    readOnly: new Compartment(),
+    editable: new Compartment(),
+    lineWrap: new Compartment(),
+    codeTheme: new Compartment(),
+    codeBlockDecorator: new Compartment(),
+    codeBlockLivePreview: new Compartment(),
+    contentTheme: new Compartment(),
+  };
+}
 
-  // Initialize EditorView
-  onMounted(() => {
-    if (!container.value) return;
+function createWholeDocumentSyncStrategy(syncState: EditorSyncState): EditorDocumentSyncStrategy {
+  return {
+    applyExternalValue(view, value) {
+      const currentValue = view.state.doc.toString();
+      if (value === currentValue) return;
 
-    const resolvedTheme = resolveEditorTheme(props.theme);
-
-    const extensions = [
-      // Undo/redo history
-      history(),
-
-      // History keymap
-      keymap.of(historyKeymap),
-
-      // Basic keymap
-      keymap.of(defaultKeymap),
-
-      // Mod-s keymap for save
-      Prec.highest(
-        keymap.of([
-          {
-            key: 'Mod-s',
-            preventDefault: true,
-            run: () => {
-              emit('save');
-              return true;
-            },
-          },
-        ]),
-      ),
-
-      // Markdown language support with syntax highlighting and nested code languages
-      markdown({
-        base: markdownLanguage,
-        codeLanguages: createLanguageDescriptions(),
-      }),
-      syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-
-      // Optional vim mode behavior
-      vimCompartment.of(props.vimMode ? vim({ status: false }) : []),
-
-      // Keep the inner editor layout aligned with the container height
-      fillHeightLayout,
-
-      // Font theme
-      fontTheme,
-
-      // Base theme used by both livePreview and source mode
-      HYBRID_BASE_THEME,
-
-      // Content theme (dynamic)
-      contentThemeCompartment.of(createContentTheme(resolvedTheme.content)),
-
-      // Code block decorator (always active, independent of hybridMarkdown)
-      codeBlockDecoratorCompartment.of(
-        createCodeBlockDecoratorExtension(props.codeLineNumbers || false),
-      ),
-
-      codeBlockLivePreviewCompartment.of(
-        props.livePreview
-          ? createCodeBlockLivePreviewExtension({
-              showLineNumbers: props.codeLineNumbers || false,
-            })
-          : [],
-      ),
-
-      // Optional hybrid markdown rendering layer
-      hybridCompartment.of(props.livePreview ? createLivePreviewExtensions(props.renderHooks) : []),
-
-      // Code font decoration for non-livePreview mode (dynamic)
-      codeDecorationCompartment.of(props.livePreview ? [] : createCodeDecorationExtension()),
-
-      // Theme (dynamic)
-      themeCompartment.of(resolvedTheme.chrome),
-
-      // Code block theme (dynamic)
-      codeThemeCompartment.of(
-        createCodeThemeExtension(resolveCodeTheme(props.codeTheme, resolvedTheme.type)),
-      ),
-
-      // Line numbers (dynamic)
-      lineNumbersCompartment.of(props.lineNumbers !== false ? lineNumbers() : []),
-
-      // Line wrapping (dynamic)
-      lineWrapCompartment.of(props.lineWrap !== false ? EditorView.lineWrapping : []),
-
-      // Placeholder (dynamic)
-      placeholderCompartment.of(props.placeholder ? placeholderExt(props.placeholder) : []),
-
-      // Update listener for v-model
-      EditorView.updateListener.of((update) => {
-        if (update.docChanged && !isInternalUpdate) {
-          const value = update.state.doc.toString();
-          emit('update:modelValue', value);
-          emit('change', value);
-        }
-      }),
-
-      // Focus/blur handlers
-      EditorView.domEventHandlers({
-        focus: () => {
-          emit('focus');
-        },
-        blur: (event) => {
-          if (isStructuredTableOverlayTarget(event.relatedTarget)) {
-            return;
-          }
-          emit('blur');
-        },
-        // Image drag handler
-        drop: (event) => {
-          const files = extractImageFiles(event.dataTransfer!);
-          if (files.length > 0) {
-            event.preventDefault();
-            emit('drop', files);
-            return true;
-          }
-          return false;
-        },
-        // Image paste handler
-        paste: (event) => {
-          const files = extractImageFiles(event.clipboardData!);
-          if (files.length > 0) {
-            event.preventDefault();
-            emit('drop', files);
-            return true;
-          }
-          return false;
-        },
-      }),
-
-      // Disabled/readonly state (dynamic)
-      readOnlyCompartment.of(EditorState.readOnly.of(props.disabled || props.readonly || false)),
-    ];
-
-    editorView.value = new EditorView({
-      state: EditorState.create({
-        doc: props.modelValue,
-        extensions,
-      }),
-      parent: container.value,
-    });
-
-    // Configure Vim mode behavior
-    if (props.vimMode) {
-      Vim.defineEx('write', 'w', () => {
-        emit('save');
-      });
-      // Fix arrow keys and j/k to follow logical line navigation (Vim convention)
-      setupVimLogicalNavigation();
-      setupStructuredTableVim();
-    }
-  });
-
-  // Watch modelValue prop and update EditorView
-  watch(
-    () => props.modelValue,
-    (newValue) => {
-      if (!editorView.value) return;
-      const currentValue = editorView.value.state.doc.toString();
-      if (newValue !== currentValue) {
-        isInternalUpdate = true;
-        editorView.value.dispatch({
+      syncState.isApplyingExternalUpdate = true;
+      try {
+        view.dispatch({
           changes: {
             from: 0,
             to: currentValue.length,
-            insert: newValue,
+            insert: value,
           },
         });
-        isInternalUpdate = false;
+      } finally {
+        syncState.isApplyingExternalUpdate = false;
       }
     },
-  );
+  };
+}
 
-  // Watch theme and codeTheme props and update dynamically
+function createRuntimeContext(): EditorRuntimeContext {
+  const syncState: EditorSyncState = {
+    isApplyingExternalUpdate: false,
+  };
+
+  return {
+    editorView: ref<EditorView>(),
+    compartments: createRuntimeCompartments(),
+    syncState,
+    documentSyncStrategy: createWholeDocumentSyncStrategy(syncState),
+  };
+}
+
+function resolveInteractivityState(
+  input: Pick<EditorProps, 'disabled' | 'readonly'>,
+): EditorInteractivityState {
+  const isDisabled = input.disabled === true;
+  const isReadonly = input.readonly === true;
+
+  return {
+    isDisabled,
+    isReadonly,
+    isReadOnly: isDisabled || isReadonly,
+    isEditable: !isDisabled,
+  };
+}
+
+function extractImageFiles(dataTransfer?: DataTransfer | null): File[] {
+  if (!dataTransfer) return [];
+
+  const files: File[] = [];
+  for (let i = 0; i < dataTransfer.files.length; i += 1) {
+    const file = dataTransfer.files[i];
+    if (file.type.startsWith('image/')) {
+      files.push(file);
+    }
+  }
+
+  return files;
+}
+
+function createFileInputHandler(
+  input: EditorRuntimeInput,
+  source: EditorFileInputSource,
+  dataTransfer: DataTransfer | null | undefined,
+  event: DragEvent | ClipboardEvent,
+): boolean {
+  const files = extractImageFiles(dataTransfer);
+  if (!files.length) return false;
+
+  event.preventDefault();
+  if (resolveInteractivityState(input.props).isDisabled) {
+    return true;
+  }
+
+  input.callbacks.onFileInput({ source, files });
+  return true;
+}
+
+function createEditorExtensions(
+  input: EditorRuntimeInput,
+  runtime: EditorRuntimeContext,
+): Extension[] {
+  const { props, appearance, callbacks } = input;
+  const { compartments, syncState } = runtime;
+  const currentAppearance = appearance.value;
+  const interactivity = resolveInteractivityState(props);
+
+  return [
+    history(),
+    keymap.of(historyKeymap),
+    keymap.of(defaultKeymap),
+    Prec.highest(
+      keymap.of([
+        {
+          key: 'Mod-s',
+          preventDefault: true,
+          run: () => {
+            callbacks.onSave();
+            return true;
+          },
+        },
+      ]),
+    ),
+    markdown({
+      base: markdownLanguage,
+      codeLanguages: createLanguageDescriptions(),
+    }),
+    syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+    compartments.vim.of(props.vimMode ? vim({ status: false }) : []),
+    fillHeightLayout,
+    fontTheme,
+    HYBRID_BASE_THEME,
+    compartments.contentTheme.of(createContentTheme(currentAppearance.editorTheme.content)),
+    compartments.codeBlockDecorator.of(
+      createCodeBlockDecoratorExtension(props.codeLineNumbers || false),
+    ),
+    compartments.codeBlockLivePreview.of(
+      props.livePreview
+        ? createCodeBlockLivePreviewExtension({
+            showLineNumbers: props.codeLineNumbers || false,
+          })
+        : [],
+    ),
+    compartments.hybrid.of(props.livePreview ? createLivePreviewExtensions(props.renderHooks) : []),
+    compartments.codeDecoration.of(props.livePreview ? [] : createCodeDecorationExtension()),
+    compartments.theme.of(currentAppearance.editorTheme.chrome),
+    compartments.codeTheme.of(createCodeThemeExtension(currentAppearance.codeTheme)),
+    compartments.lineNumbers.of(props.lineNumbers !== false ? lineNumbers() : []),
+    compartments.lineWrap.of(props.lineWrap !== false ? EditorView.lineWrapping : []),
+    compartments.placeholder.of(props.placeholder ? placeholderExt(props.placeholder) : []),
+    EditorView.updateListener.of((update) => {
+      if (update.docChanged && !syncState.isApplyingExternalUpdate) {
+        const value = update.state.doc.toString();
+        callbacks.onModelValueChange(value);
+        callbacks.onChange(value);
+      }
+    }),
+    EditorView.domEventHandlers({
+      focus: () => {
+        callbacks.onFocus();
+      },
+      blur: (event) => {
+        if (isStructuredTableOverlayTarget(event.relatedTarget)) {
+          return;
+        }
+        callbacks.onBlur();
+      },
+      drop: (event) => {
+        return createFileInputHandler(input, 'drop', event.dataTransfer, event);
+      },
+      paste: (event) => {
+        return createFileInputHandler(input, 'paste', event.clipboardData, event);
+      },
+    }),
+    compartments.readOnly.of(EditorState.readOnly.of(interactivity.isReadOnly)),
+    compartments.editable.of(EditorView.editable.of(interactivity.isEditable)),
+  ];
+}
+
+function mountEditorRuntime(
+  container: Ref<HTMLElement | undefined>,
+  input: EditorRuntimeInput,
+  runtime: EditorRuntimeContext,
+): void {
+  if (!container.value) return;
+
+  if (input.props.vimMode) {
+    ensureVimGlobalSetup();
+  }
+
+  const view = new EditorView({
+    state: EditorState.create({
+      doc: input.props.modelValue,
+      extensions: createEditorExtensions(input, runtime),
+    }),
+    parent: container.value,
+  });
+
+  runtime.editorView.value = view;
+  registerVimSaveHandler(view, input.callbacks.onSave);
+}
+
+function teardownEditorRuntime(runtime: EditorRuntimeContext): void {
+  const view = runtime.editorView.value;
+  if (!view) return;
+
+  unregisterVimSaveHandler(view);
+  view.destroy();
+  runtime.editorView.value = undefined;
+}
+
+function setupDocumentSynchronization(
+  input: EditorRuntimeInput,
+  runtime: EditorRuntimeContext,
+): void {
   watch(
-    () => [props.codeTheme, props.theme] as const,
-    ([codeThemeName, editorTheme]) => {
-      if (!editorView.value) return;
-      const resolvedTheme = resolveEditorTheme(editorTheme);
-      const theme = resolveCodeTheme(codeThemeName, resolvedTheme.type);
-      editorView.value.dispatch({
-        effects: [
-          themeCompartment.reconfigure(resolvedTheme.chrome),
-          contentThemeCompartment.reconfigure(createContentTheme(resolvedTheme.content)),
-          codeThemeCompartment.reconfigure(createCodeThemeExtension(theme)),
-          remeasureEffect.of(null),
-        ],
-      });
+    () => input.props.modelValue,
+    (value) => {
+      const view = runtime.editorView.value;
+      if (!view) return;
+      runtime.documentSyncStrategy.applyExternalValue(view, value);
     },
   );
+}
 
-  // Watch codeLineNumbers prop and update dynamically
+function setupAppearanceSynchronization(
+  input: EditorRuntimeInput,
+  runtime: EditorRuntimeContext,
+): void {
   watch(
-    () => [props.codeLineNumbers, props.livePreview] as const,
+    input.appearance,
+    (nextAppearance, previousAppearance) => {
+      const view = runtime.editorView.value;
+      if (!view) return;
+
+      const themeChanged =
+        !previousAppearance ||
+        nextAppearance.contentThemeSignature !== previousAppearance.contentThemeSignature;
+      const codeThemeChanged =
+        !previousAppearance ||
+        nextAppearance.codeThemeSignature !== previousAppearance.codeThemeSignature;
+      const layoutChanged =
+        !previousAppearance ||
+        nextAppearance.layoutSignature !== previousAppearance.layoutSignature;
+
+      const effects = [];
+      if (themeChanged) {
+        effects.push(
+          runtime.compartments.theme.reconfigure(nextAppearance.editorTheme.chrome),
+          runtime.compartments.contentTheme.reconfigure(
+            createContentTheme(nextAppearance.editorTheme.content),
+          ),
+        );
+      }
+      if (codeThemeChanged) {
+        effects.push(
+          runtime.compartments.codeTheme.reconfigure(
+            createCodeThemeExtension(nextAppearance.codeTheme),
+          ),
+        );
+      }
+      if (themeChanged || codeThemeChanged || layoutChanged) {
+        effects.push(remeasureEffect.of(null));
+      }
+
+      if (effects.length) {
+        view.dispatch({ effects });
+      }
+
+      const fontFamilyChanged =
+        nextAppearance.fontFamily !== previousAppearance?.fontFamily ||
+        nextAppearance.codeFontFamily !== previousAppearance?.codeFontFamily;
+
+      if (
+        layoutChanged &&
+        fontFamilyChanged &&
+        typeof document !== 'undefined' &&
+        'fonts' in document
+      ) {
+        document.fonts.ready.then(() => {
+          runtime.editorView.value?.dispatch({ effects: remeasureEffect.of(null) });
+        });
+      }
+    },
+    { flush: 'post' },
+  );
+}
+
+function setupBehaviorSynchronization(
+  input: EditorRuntimeInput,
+  runtime: EditorRuntimeContext,
+): void {
+  watch(
+    () => [input.props.codeLineNumbers, input.props.livePreview] as const,
     ([showLineNumbers, livePreview]) => {
-      if (!editorView.value) return;
-      editorView.value.dispatch({
+      const view = runtime.editorView.value;
+      if (!view) return;
+
+      view.dispatch({
         effects: [
-          codeBlockDecoratorCompartment.reconfigure(
+          runtime.compartments.codeBlockDecorator.reconfigure(
             createCodeBlockDecoratorExtension(showLineNumbers || false),
           ),
-          codeBlockLivePreviewCompartment.reconfigure(
+          runtime.compartments.codeBlockLivePreview.reconfigure(
             livePreview
               ? createCodeBlockLivePreviewExtension({
                   showLineNumbers: showLineNumbers || false,
@@ -353,145 +435,149 @@ export function useEditor(
     },
   );
 
-  // Watch hybridMarkdown prop and update dynamically
   watch(
-    () => [props.livePreview, props.renderHooks] as const,
+    () => [input.props.livePreview, input.props.renderHooks] as const,
     ([enabled, renderHooks]) => {
-      if (!editorView.value) return;
-      editorView.value.dispatch({
+      const view = runtime.editorView.value;
+      if (!view) return;
+
+      view.dispatch({
         effects: [
-          hybridCompartment.reconfigure(enabled ? createLivePreviewExtensions(renderHooks) : []),
-          codeDecorationCompartment.reconfigure(enabled ? [] : createCodeDecorationExtension()),
+          runtime.compartments.hybrid.reconfigure(
+            enabled ? createLivePreviewExtensions(renderHooks) : [],
+          ),
+          runtime.compartments.codeDecoration.reconfigure(
+            enabled ? [] : createCodeDecorationExtension(),
+          ),
         ],
       });
     },
   );
 
-  // Watch vimMode prop and update dynamically
   watch(
-    () => props.vimMode,
-    (enabled) => {
-      if (!editorView.value) return;
-      editorView.value.dispatch({
-        effects: vimCompartment.reconfigure(enabled ? vim({ status: false }) : []),
-      });
-
-      // Configure Vim :w command when enabling Vim mode
-      if (enabled) {
-        Vim.defineEx('write', 'w', () => {
-          emit('save');
-        });
-        setupStructuredTableVim();
-      }
-    },
-  );
-
-  // Watch lineNumbers prop and update dynamically
-  watch(
-    () => props.lineNumbers,
+    () => input.props.lineNumbers,
     (showLineNumbers) => {
-      if (!editorView.value) return;
-      editorView.value.dispatch({
-        effects: lineNumbersCompartment.reconfigure(showLineNumbers !== false ? lineNumbers() : []),
+      const view = runtime.editorView.value;
+      if (!view) return;
+
+      view.dispatch({
+        effects: runtime.compartments.lineNumbers.reconfigure(
+          showLineNumbers !== false ? lineNumbers() : [],
+        ),
       });
     },
   );
 
-  // Watch lineWrap prop and update dynamically
   watch(
-    () => props.lineWrap,
+    () => input.props.lineWrap,
     (shouldWrap) => {
-      if (!editorView.value) return;
-      editorView.value.dispatch({
-        effects: lineWrapCompartment.reconfigure(
+      const view = runtime.editorView.value;
+      if (!view) return;
+
+      view.dispatch({
+        effects: runtime.compartments.lineWrap.reconfigure(
           shouldWrap !== false ? EditorView.lineWrapping : [],
         ),
       });
     },
   );
 
-  // Watch placeholder prop and update dynamically
   watch(
-    () => props.placeholder,
-    (newPlaceholder) => {
-      if (!editorView.value) return;
-      editorView.value.dispatch({
-        effects: placeholderCompartment.reconfigure(
-          newPlaceholder ? placeholderExt(newPlaceholder) : [],
+    () => input.props.placeholder,
+    (nextPlaceholder) => {
+      const view = runtime.editorView.value;
+      if (!view) return;
+
+      view.dispatch({
+        effects: runtime.compartments.placeholder.reconfigure(
+          nextPlaceholder ? placeholderExt(nextPlaceholder) : [],
         ),
       });
     },
   );
 
-  // Watch disabled/readonly props and update dynamically
   watch(
-    () => [props.disabled, props.readonly] as const,
+    () => [input.props.disabled, input.props.readonly] as const,
     ([disabled, readonly]) => {
-      if (!editorView.value) return;
-      editorView.value.dispatch({
-        effects: readOnlyCompartment.reconfigure(
-          EditorState.readOnly.of(disabled || readonly || false),
-        ),
+      const view = runtime.editorView.value;
+      if (!view) return;
+
+      const interactivity = resolveInteractivityState({ disabled, readonly });
+      view.dispatch({
+        effects: [
+          runtime.compartments.readOnly.reconfigure(
+            EditorState.readOnly.of(interactivity.isReadOnly),
+          ),
+          runtime.compartments.editable.reconfigure(
+            EditorView.editable.of(interactivity.isEditable),
+          ),
+        ],
       });
     },
   );
+}
 
-  // Watch font props and trigger remeasure after DOM style update
+function setupIntegrationSynchronization(
+  input: EditorRuntimeInput,
+  runtime: EditorRuntimeContext,
+): void {
   watch(
-    () => [props.fontFamily, props.codeFontFamily, props.fontSize] as const,
-    ([fontFamily, codeFontFamily], [prevFontFamily, prevCodFontFamily]) => {
-      if (!editorView.value) return;
-      // Dispatch a transaction with remeasureEffect so CM updates geometry
-      // and hybrid decorations rebuild within the same update cycle.
-      editorView.value.dispatch({ effects: remeasureEffect.of(null) });
+    () => input.props.vimMode,
+    (enabled) => {
+      const view = runtime.editorView.value;
+      if (!view) return;
 
-      // If font family changed, wait for fonts to load and remeasure again
-      if (fontFamily !== prevFontFamily || codeFontFamily !== prevCodFontFamily) {
-        document.fonts.ready.then(() => {
-          editorView.value?.dispatch({ effects: remeasureEffect.of(null) });
-        });
+      if (enabled) {
+        ensureVimGlobalSetup();
       }
-    },
-    { flush: 'post' },
-  );
 
-  watch(
-    () => props.contentMaxWidth,
-    () => {
-      if (!editorView.value) return;
-      editorView.value.dispatch({ effects: remeasureEffect.of(null) });
+      view.dispatch({
+        effects: runtime.compartments.vim.reconfigure(enabled ? vim({ status: false }) : []),
+      });
     },
-    { flush: 'post' },
   );
+}
 
-  // Cleanup EditorView
+export function useEditor(container: Ref<HTMLElement | undefined>, input: EditorRuntimeInput) {
+  const runtime = createRuntimeContext();
+  const { props } = input;
+
+  onMounted(() => {
+    mountEditorRuntime(container, input, runtime);
+  });
+
+  setupDocumentSynchronization(input, runtime);
+  setupAppearanceSynchronization(input, runtime);
+  setupBehaviorSynchronization(input, runtime);
+  setupIntegrationSynchronization(input, runtime);
+
   onBeforeUnmount(() => {
-    editorView.value?.destroy();
+    teardownEditorRuntime(runtime);
   });
 
   // Exposed methods
   const focus = () => {
-    editorView.value?.focus();
+    runtime.editorView.value?.focus();
   };
 
   const getSelection = (): string => {
-    if (!editorView.value) return '';
-    const state = editorView.value.state;
+    if (!runtime.editorView.value) return '';
+    const state = runtime.editorView.value.state;
     const selection = state.selection.main;
     return state.doc.sliceString(selection.from, selection.to);
   };
 
   const getEditorView = (): EditorView | undefined => {
-    return editorView.value;
+    return runtime.editorView.value;
   };
 
   const insertText = (text: string) => {
-    if (!editorView.value) return;
-    const view = editorView.value;
+    if (!runtime.editorView.value) return;
+    if (resolveInteractivityState(props).isReadOnly) return;
+
+    const view = runtime.editorView.value;
     const selection = view.state.selection.main;
 
-    // Don't set isInternalUpdate here - insertText is a public API
-    // and should trigger modelValue updates
     view.dispatch({
       changes: {
         from: selection.from,
@@ -504,8 +590,8 @@ export function useEditor(
   };
 
   const getHeadings = (): Heading[] => {
-    if (!editorView.value) return [];
-    const state = editorView.value.state;
+    if (!runtime.editorView.value) return [];
+    const state = runtime.editorView.value.state;
     const tree = syntaxTree(state);
     const headings: Heading[] = [];
 
@@ -528,14 +614,14 @@ export function useEditor(
   };
 
   const scrollToLine = (lineNumber: number) => {
-    if (!editorView.value) return;
-    const doc = editorView.value.state.doc;
+    if (!runtime.editorView.value) return;
+    const doc = runtime.editorView.value.state.doc;
 
     if (lineNumber < 1) lineNumber = 1;
     if (lineNumber > doc.lines) lineNumber = doc.lines;
 
     const line = doc.line(lineNumber);
-    const view = editorView.value;
+    const view = runtime.editorView.value;
     const isFocused = view.hasFocus;
 
     // Use lineBlockAt to get the visual position of the line
@@ -559,17 +645,19 @@ export function useEditor(
   };
 
   const undoHistory = () => {
-    if (!editorView.value) return false;
-    return undo(editorView.value);
+    if (!runtime.editorView.value) return false;
+    if (resolveInteractivityState(props).isReadOnly) return false;
+    return undo(runtime.editorView.value);
   };
 
   const redoHistory = () => {
-    if (!editorView.value) return false;
-    return redo(editorView.value);
+    if (!runtime.editorView.value) return false;
+    if (resolveInteractivityState(props).isReadOnly) return false;
+    return redo(runtime.editorView.value);
   };
 
   return {
-    editorView,
+    editorView: runtime.editorView,
     focus,
     getSelection,
     getEditorView,

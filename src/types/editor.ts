@@ -212,7 +212,17 @@ export interface EditorProps {
   vimMode?: boolean;
   locale?: string | CustomLocale;
   placeholder?: string;
+
+  /**
+   * Prevent user-initiated editing and file intake while still allowing
+   * the mounted runtime to receive external modelValue updates.
+   */
   disabled?: boolean;
+
+  /**
+   * Prevent document mutation while preserving focus, selection, copy,
+   * and other non-mutating interactions.
+   */
   readonly?: boolean;
   theme?: 'light' | 'dark' | EditorTheme;
   fontFamily?: string;
@@ -242,6 +252,10 @@ export interface EditorEvents {
   save: () => void;
   focus: () => void;
   blur: () => void;
+
+  /**
+   * Compatibility event for image file input from both drag-drop and paste.
+   */
   drop: (files: File[]) => void;
 }
 
@@ -258,6 +272,10 @@ export interface EditorExposed {
   getSelection: () => string;
   toggleFullscreen: (mode?: 'browser' | 'screen') => void;
   exitFullscreen: () => void;
+
+  /**
+   * Advanced compatibility escape hatch for direct CodeMirror access.
+   */
   getEditorView: () => EditorView | undefined;
   insertText: (text: string) => void;
   getHeadings: () => Heading[];

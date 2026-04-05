@@ -2,8 +2,9 @@
 import { ref, useAttrs, computed } from 'vue';
 import { useEditor } from '../composables/useEditor';
 import { useFullscreen } from '../composables/useFullscreen';
-import { resolveEditorTheme } from '../themes/editorThemes';
+import { resolveEditorAppearance } from '../themes/editorAppearance';
 import type { EditorProps, EditorExposed } from '../types/editor';
+import type { EditorRuntimeCallbacks } from '../types/editorRuntime';
 import zhCN from '../locales/zh-CN';
 import enUS from '../locales/en-US';
 
@@ -51,23 +52,19 @@ const localeMessages = computed(() => {
   return props.locale || zhCN;
 });
 
-// Computed style for editor CSS variables
+const resolvedAppearance = computed(() =>
+  resolveEditorAppearance({
+    theme: props.theme,
+    codeTheme: props.codeTheme,
+    fontFamily: props.fontFamily,
+    codeFontFamily: props.codeFontFamily,
+    fontSize: props.fontSize,
+    contentMaxWidth: props.contentMaxWidth,
+  }),
+);
+
 const containerStyle = computed(() => {
-  const resolvedTheme = resolveEditorTheme(props.theme);
-  const style: Record<string, string> = {};
-  if (props.fontFamily) {
-    style['--una-font-family'] = props.fontFamily;
-  }
-  if (props.codeFontFamily) {
-    style['--una-code-font-family'] = props.codeFontFamily;
-  }
-  if (props.fontSize !== undefined) {
-    style['--una-font-size'] = `${props.fontSize}px`;
-  }
-  style['--una-content-max-width'] = `${props.contentMaxWidth}px`;
-  style['--una-editor-surface'] = resolvedTheme.type === 'dark' ? '#282c34' : '#ffffff';
-  style['--una-table-header-bg'] = resolvedTheme.table.headerBackground;
-  return style;
+  return resolvedAppearance.value.containerStyle;
 });
 
 // Show tip when entering browser fullscreen
@@ -77,6 +74,27 @@ const handleBrowserFullscreenEnter = () => {
   setTimeout(() => {
     showFullscreenTip.value = false;
   }, 3000);
+};
+
+const runtimeCallbacks: EditorRuntimeCallbacks = {
+  onModelValueChange: (value) => {
+    emit('update:modelValue', value);
+  },
+  onChange: (value) => {
+    emit('change', value);
+  },
+  onSave: () => {
+    emit('save');
+  },
+  onFocus: () => {
+    emit('focus');
+  },
+  onBlur: () => {
+    emit('blur');
+  },
+  onFileInput: ({ files }) => {
+    emit('drop', files);
+  },
 };
 
 // Use composables
@@ -89,7 +107,11 @@ const {
   scrollToLine,
   undoHistory,
   redoHistory,
-} = useEditor(editorContainer, props, emit);
+} = useEditor(editorContainer, {
+  props,
+  appearance: resolvedAppearance,
+  callbacks: runtimeCallbacks,
+});
 const { toggleFullscreen, exitFullscreen } = useFullscreen(
   editorContainer,
   handleBrowserFullscreenEnter,

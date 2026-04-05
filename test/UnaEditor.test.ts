@@ -58,6 +58,19 @@ async function dispatchTypedText(view: EditorView, text: string) {
   }
 }
 
+function createFileList(files: File[]): FileList {
+  const fileList: Partial<FileList> & { [index: number]: File } = {
+    length: files.length,
+    item: (index: number) => files[index] ?? null,
+  };
+
+  files.forEach((file, index) => {
+    fileList[index] = file;
+  });
+
+  return fileList as FileList;
+}
+
 function installHostSpanReset() {
   const style = document.createElement('style');
   style.textContent = `
@@ -135,6 +148,24 @@ describe('UnaEditor', () => {
       },
     });
     expect(wrapper.props('modelValue')).toBe('initial content');
+  });
+
+  it('preserves the mounted EditorView instance during external modelValue updates', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: 'before',
+      },
+    });
+
+    const initialView = await getEditorView(wrapper);
+
+    await wrapper.setProps({ modelValue: 'after' });
+    await nextTick();
+
+    const nextView = await getEditorView(wrapper);
+
+    expect(nextView).toBe(initialView);
+    expect(nextView.state.doc.toString()).toBe('after');
   });
 
   it('respects livePreview prop', () => {
@@ -639,6 +670,62 @@ describe('UnaEditor', () => {
     expect(
       linkOnlyWrapper.find('.cm-hybrid-image-element').attributes('data-source'),
     ).toBeUndefined();
+  });
+
+  it('keeps drop as the compatibility event for both drag and paste image input', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '',
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    const imageFile = new File(['demo'], 'demo.png', { type: 'image/png' });
+    const fileList = createFileList([imageFile]);
+
+    const dropEvent = new Event('drop', { bubbles: true, cancelable: true }) as Event & {
+      dataTransfer: DataTransfer;
+    };
+    dropEvent.dataTransfer = { files: fileList } as DataTransfer;
+    view.contentDOM.dispatchEvent(dropEvent);
+    await nextTick();
+
+    const pasteEvent = new Event('paste', { bubbles: true, cancelable: true }) as Event & {
+      clipboardData: DataTransfer;
+    };
+    pasteEvent.clipboardData = { files: fileList } as DataTransfer;
+    view.contentDOM.dispatchEvent(pasteEvent);
+    await nextTick();
+
+    expect(wrapper.emitted('drop')).toEqual([[[imageFile]], [[imageFile]]]);
+  });
+
+  it('blocks drag and paste image intake when disabled is true', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: '',
+        disabled: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+    const imageFile = new File(['demo'], 'demo.png', { type: 'image/png' });
+    const fileList = createFileList([imageFile]);
+
+    const dropEvent = new Event('drop', { bubbles: true, cancelable: true }) as Event & {
+      dataTransfer: DataTransfer;
+    };
+    dropEvent.dataTransfer = { files: fileList } as DataTransfer;
+    view.contentDOM.dispatchEvent(dropEvent);
+
+    const pasteEvent = new Event('paste', { bubbles: true, cancelable: true }) as Event & {
+      clipboardData: DataTransfer;
+    };
+    pasteEvent.clipboardData = { files: fileList } as DataTransfer;
+    view.contentDOM.dispatchEvent(pasteEvent);
+    await nextTick();
+
+    expect(wrapper.emitted('drop')).toBeUndefined();
   });
 
   it('falls back to original values when hooks throw or return nothing', async () => {
@@ -1617,9 +1704,7 @@ describe('UnaEditor', () => {
       'cm-structured-table-overlay-visible',
     );
     const activeCell = wrapper.find('[data-cell-row="1"][data-cell-col="0"]');
-    expect(activeCell.classes()).toContain(
-      'cm-structured-table-cell-active',
-    );
+    expect(activeCell.classes()).toContain('cm-structured-table-cell-active');
     expect(view.state.selection.main.head).toBe(Number(activeCell.attributes('data-content-from')));
   });
 
@@ -2986,7 +3071,9 @@ describe('UnaEditor', () => {
       const gutterRules = getCssRulesContaining('.cm-gutters');
 
       expect(
-        contentRules.some((text) => text.includes('max-width: var(--una-content-max-width, 720px)')),
+        contentRules.some((text) =>
+          text.includes('max-width: var(--una-content-max-width, 720px)'),
+        ),
       ).toBe(true);
       expect(contentRules.some((text) => text.includes('margin-left: auto'))).toBe(true);
       expect(contentRules.some((text) => text.includes('margin-right: auto'))).toBe(true);
@@ -3522,6 +3609,44 @@ describe('UnaEditor', () => {
         value: originalClipboard,
       });
     }
+  });
+
+  it('prevents mutating command APIs when readonly is true', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: 'readonly document',
+        readonly: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+
+    wrapper.vm.insertText?.(' changed');
+    await nextTick();
+
+    expect(view.state.doc.toString()).toBe('readonly document');
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+    expect(wrapper.vm.undoHistory?.()).toBe(false);
+    expect(wrapper.vm.redoHistory?.()).toBe(false);
+  });
+
+  it('prevents mutating command APIs when disabled is true', async () => {
+    const wrapper = mount(UnaEditor, {
+      props: {
+        modelValue: 'disabled document',
+        disabled: true,
+      },
+    });
+
+    const view = await getEditorView(wrapper);
+
+    wrapper.vm.insertText?.(' changed');
+    await nextTick();
+
+    expect(view.state.doc.toString()).toBe('disabled document');
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+    expect(wrapper.vm.undoHistory?.()).toBe(false);
+    expect(wrapper.vm.redoHistory?.()).toBe(false);
   });
 
   it('renders begin body end lines with a shared faux gutter width in live preview code blocks', async () => {
