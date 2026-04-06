@@ -87,6 +87,7 @@ describe('Code Block Syntax Highlighting', () => {
       expect(isLanguageSupported('javascript')).toBe(true);
       expect(isLanguageSupported('typescript')).toBe(true);
       expect(isLanguageSupported('css')).toBe(true);
+      expect(isLanguageSupported('html')).toBe(true);
       expect(isLanguageSupported('shell')).toBe(true);
     });
 
@@ -123,16 +124,19 @@ describe('Code Block Syntax Highlighting', () => {
       expect(languages).toContain('javascript');
       expect(languages).toContain('python');
       expect(languages).toContain('typescript');
+      expect(languages).toContain('html');
     });
 
     it('should normalize aliases and resolve display labels consistently', () => {
       expect(normalizeLanguageIdentifier('JS')).toBe('javascript');
       expect(normalizeLanguageIdentifier('bash')).toBe('shell');
+      expect(normalizeLanguageIdentifier('HTML')).toBe('html');
       expect(normalizeLanguageIdentifier('unknown-lang')).toBe('unknown-lang');
 
       expect(getLanguageDisplayLabel('js')).toBe('JavaScript');
       expect(getLanguageDisplayLabel('javascript')).toBe('JavaScript');
       expect(getLanguageDisplayLabel('BASH')).toBe('Shell');
+      expect(getLanguageDisplayLabel('html')).toBe('HTML');
       expect(getLanguageDisplayLabel('unknown-lang')).toBeUndefined();
     });
   });
@@ -205,6 +209,57 @@ describe('Code Block Syntax Highlighting', () => {
       expect(codeLine.exists()).toBe(true);
       // Code block fence should also be present
       expect(wrapper.find('.cm-code-block-fence').exists()).toBe(true);
+    });
+  });
+
+  describe('HTML Code Block Highlighting', () => {
+    it('should keep existing JavaScript syntax highlighting in standard mode', async () => {
+      const wrapper = mount(UnaEditor, {
+        props: {
+          modelValue: '```js\nconst answer = 42;\n```',
+          livePreview: false,
+        },
+      });
+
+      await getEditorView(wrapper);
+      await nextTick();
+
+      expect(wrapper.element.querySelector('.cm-code-block-line .tok-keyword')).not.toBeNull();
+      expect(wrapper.element.querySelector('.cm-code-block-line .tok-number')).not.toBeNull();
+    });
+
+    it('should apply HTML syntax tokens in standard mode', async () => {
+      const wrapper = mount(UnaEditor, {
+        props: {
+          modelValue: '```html\n<div class="hero">Hello</div>\n```',
+          livePreview: false,
+        },
+      });
+
+      await getEditorView(wrapper);
+      await nextTick();
+
+      expect(wrapper.element.querySelector('.cm-code-block-line .tok-typeName')).not.toBeNull();
+      expect(wrapper.element.querySelector('.cm-code-block-line .tok-propertyName')).not.toBeNull();
+    });
+
+    it('should preserve HTML highlighting and language label in live preview mode', async () => {
+      const wrapper = mount(UnaEditor, {
+        props: {
+          modelValue: '```html\n<div class="hero">Hello</div>\n```',
+          livePreview: true,
+        },
+      });
+
+      await getEditorView(wrapper);
+      await nextTick();
+
+      const beginLine = wrapper.element.querySelector('.cm-line.cm-code-block-live-begin');
+      expect(beginLine?.querySelector('.cm-code-block-language-label')?.textContent).toBe('HTML');
+      expect(wrapper.element.querySelector('.cm-line.cm-code-block-live-body .tok-typeName')).not.toBeNull();
+      expect(
+        wrapper.element.querySelector('.cm-line.cm-code-block-live-body .tok-propertyName'),
+      ).not.toBeNull();
     });
   });
 });

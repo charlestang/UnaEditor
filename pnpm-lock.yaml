@@ -20,6 +20,9 @@ importers:
       '@codemirror/lang-css':
         specifier: ^6.3.1
         version: 6.3.1
+      '@codemirror/lang-html':
+        specifier: ^6.4.11
+        version: 6.4.11
       '@codemirror/lang-java':
         specifier: ^6.0.2
         version: 6.0.2

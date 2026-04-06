@@ -3,9 +3,7 @@
 ## Purpose
 
 定义围栏代码块的语法高亮能力，包括语言检测、嵌套解析、支持语言集合、性能边界以及在不同编辑模式下的一致表现。
-
 ## Requirements
-
 ### Requirement: 围栏代码块必须显示语法高亮
 
 编辑器 MUST 根据指定的语言标识符对围栏代码块应用语法高亮。
@@ -46,7 +44,7 @@
 #### Scenario: 核心语言立即可用
 
 - **WHEN** 编辑器加载时
-- **THEN** JavaScript、TypeScript、CSS、Markdown 和 Shell 语言 MUST 无需额外加载即可使用
+- **THEN** JavaScript、TypeScript、CSS、HTML 和 Shell 语言 MUST 无需额外加载即可使用
 
 #### Scenario: 扩展语言按需加载
 
@@ -57,6 +55,11 @@
 
 - **WHEN** 用户指定语言为 `js`、`javascript`、`ts` 或 `typescript`
 - **THEN** 系统 MUST 应用正确的语言解析器
+
+#### Scenario: 识别 HTML 语言标识符
+
+- **WHEN** 用户编写带有语言标识符 `html` 的 fenced code block
+- **THEN** 系统 MUST 将其识别为受支持语言并应用 HTML 语法高亮
 
 ### Requirement: opening fence 中的语言标识符必须同时驱动高亮和 header label
 
@@ -73,6 +76,12 @@
 - **WHEN** 用户编写带有语言标识符 `javascript` 或 `js` 的 fenced code block
 - **THEN** 系统 MUST 正确高亮该代码块
 - **AND** header row MUST 显示 `JavaScript` 语言标签
+
+#### Scenario: HTML 语言标识符驱动标签
+
+- **WHEN** 用户编写带有语言标识符 `html` 的 fenced code block
+- **THEN** 系统 MUST 正确高亮该代码块
+- **AND** header row MUST 显示 `HTML` 语言标签
 
 #### Scenario: 未知语言标识符不得被错误归一化
 
@@ -107,3 +116,4 @@
 
 - **WHEN** 编辑器处于实时预览模式 (`livePreview=true`)
 - **THEN** 代码块 MUST 在保持实时预览样式的同时显示语法高亮
+

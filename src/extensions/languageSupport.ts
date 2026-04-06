@@ -1,6 +1,7 @@
 import { LanguageDescription, LanguageSupport } from '@codemirror/language';
 import { javascript } from '@codemirror/lang-javascript';
 import { css } from '@codemirror/lang-css';
+import { html } from '@codemirror/lang-html';
 import { StreamLanguage } from '@codemirror/language';
 import { shell } from '@codemirror/legacy-modes/mode/shell';
 
@@ -16,6 +17,7 @@ const CORE_LANGUAGES: Record<string, () => LanguageSupport> = {
   jsx: () => javascript({ jsx: true }),
   tsx: () => javascript({ jsx: true, typescript: true }),
   css: () => css(),
+  html: () => html(),
   shell: () => new LanguageSupport(StreamLanguage.define(shell)),
   bash: () => new LanguageSupport(StreamLanguage.define(shell)),
   sh: () => new LanguageSupport(StreamLanguage.define(shell)),
@@ -74,6 +76,7 @@ const LANGUAGE_DISPLAY_LABELS: Record<string, string> = {
   jsx: 'JSX',
   tsx: 'TSX',
   css: 'CSS',
+  html: 'HTML',
   shell: 'Shell',
   bash: 'Shell',
   sh: 'Shell',
@@ -96,6 +99,7 @@ const LANGUAGE_CANONICAL_IDS: Record<string, string> = {
   jsx: 'jsx',
   tsx: 'tsx',
   css: 'css',
+  html: 'html',
   shell: 'shell',
   bash: 'shell',
   sh: 'shell',
@@ -178,7 +182,7 @@ export function createLanguageDescriptions(): LanguageDescription[] {
     descriptions.push(
       LanguageDescription.of({
         name,
-        load: async () => loader(),
+        support: loader(),
       }),
     );
   }
